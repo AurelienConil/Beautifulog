@@ -38,6 +38,12 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
+    
+    // Gestionnaire d'événement pour la fermeture de la fenêtre
+    mainWindow.on('close', () => {
+        console.log('Fenêtre principale fermée, arrêt de l\'application...');
+        // Si besoin, effectuer des opérations de nettoyage supplémentaires ici
+    });
 }
 
 // Créer le serveur Socket.IO
@@ -156,16 +162,15 @@ app.whenReady().then(() => {
     setupIpcHandlers();
 });
 
-// Quitter quand toutes les fenêtres sont fermées, sauf sur macOS
+// Quitter quand toutes les fenêtres sont fermées
 app.on('window-all-closed', () => {
     // Fermer le serveur Socket.IO
     if (socketServer) {
         socketServer.close();
     }
-
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
+    
+    // Quitter l'application même sur macOS
+    app.quit();
 });
 
 app.on('activate', () => {

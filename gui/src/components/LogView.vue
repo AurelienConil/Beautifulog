@@ -12,21 +12,47 @@
           @click="scrollToBottom(true)"
         ></v-btn>
         <v-btn
-          :icon="autoScroll ? 'mdi-sync' : 'mdi-sync-off'"
+          icon="mdi-close"
           size="x-small"
-          :color="autoScroll ? 'primary' : 'grey'"
           variant="text"
+          color="grey"
           class="ml-2"
-          :title="
-            autoScroll ? 'Défilement auto activé' : 'Défilement auto désactivé'
-          "
-          @click="toggleAutoScroll"
+          title="Masquer cette colonne"
+          @click="hideColumn"
         ></v-btn>
       </div>
-      <v-chip :color="getStatusColor()" size="small">
-        {{ filteredMessages.length }} messages
-      </v-chip>
+       <v-chip-group
+        v-model="selectedTypes"
+        column
+        multiple
+        class="type-filters"
+      >
+        <v-chip
+          v-for="type in messageTypes"
+          :key="type.value"
+          :value="type.value"
+          filter
+          variant="outlined"
+          :color="type.color"
+          size="small"
+        >
+          <v-icon start size="x-small" :color="type.color">{{ type.icon }}</v-icon>
+        </v-chip>
+      </v-chip-group>
+      <div class="d-flex align-center">
+        <v-text-field
+          v-model="contentFilter"
+          placeholder="Filtrer le contenu"
+          variant="outlined"
+          density="compact"
+          hide-details
+          class="content-filter mr-2"
+          prepend-inner-icon="mdi-filter-outline"
+          clearable
+        ></v-text-field>
+      </div>
     </v-card-title>
+    
 
     <!-- Section des variables épinglées -->
     <v-card-subtitle v-if="hasVarsToShow" class="pinned-vars-panel pa-2">
@@ -84,21 +110,27 @@
               </v-icon>
             </template>
 
+            <template v-slot:append>
+              <v-tooltip location="right">
+                <template v-slot:activator="{ props }">
+                  <v-btn
+                    icon="mdi-information-outline"
+                    size="x-small"
+                    variant="text"
+                    color="grey"
+                    density="compact"
+                    v-bind="props"
+                  ></v-btn>
+                </template>
+                <div>
+                  <strong>Timestamp:</strong> {{ formatTimestamp(message.timestamp) }}<br>
+                  <strong>Socket ID:</strong> {{ message.socketId ? message.socketId : 'N/A' }}
+                </div>
+              </v-tooltip>
+            </template>
+
             <v-list-item-content>
               <v-list-item-title class="message-content">
-                <div class="message-header">
-                  <span class="timestamp">
-                    {{ formatTimestamp(message.timestamp) }}
-                  </span>
-                  <v-chip
-                    v-if="message.socketId"
-                    size="x-small"
-                    variant="outlined"
-                    class="ml-2"
-                  >
-                    {{ message.socketId.substring(0, 8) }}
-                  </v-chip>
-                </div>
                 <div class="message-data">
                   <pre v-if="isJsonData(message.msg)" class="json-data">{{
                     formatJson(message.msg)
@@ -159,6 +191,14 @@ const props = defineProps({
   },
 });
 
+// Définir les événements émis par ce composant
+const emit = defineEmits(['hide']);
+
+// Fonction pour émettre l'événement de masquage de la colonne
+const hideColumn = () => {
+  emit('hide', props.label);
+};
+
 const socketStore = useSocketStore();
 
 // Référence au conteneur des messages pour le défilement automatique
@@ -166,16 +206,22 @@ const messagesContainer = ref(null);
 const messagesList = ref(null);
 const virtualScroll = ref(null);
 
-// État pour le défilement automatique
-const autoScroll = ref(true);
+// État pour le défilement automatique (toujours activé)
+const autoScroll = true; // Changé de ref(true) à une constante fixe
 
-// Toggle pour le défilement automatique
-const toggleAutoScroll = () => {
-  autoScroll.value = !autoScroll.value;
-  if (autoScroll.value) {
-    scrollToBottom(true);
-  }
-};
+// Filtre pour le contenu des messages
+const contentFilter = ref('');
+
+// Types de messages disponibles
+const messageTypes = [
+  { label: 'INFO', value: 'info-message', color: 'info', icon: 'mdi-information' },
+  { label: 'WARNING', value: 'warning-message', color: 'warning', icon: 'mdi-alert' },
+  { label: 'ERROR', value: 'error-message', color: 'error', icon: 'mdi-alert-circle' },
+  { label: 'LOG', value: 'log-message', color: 'primary', icon: 'mdi-note-text' }
+];
+
+// Types de messages sélectionnés (tous par défaut)
+const selectedTypes = ref(messageTypes.map(type => type.value));
 
 // État local pour les variables épinglées
 const pinnedVariables = ref({});
@@ -223,30 +269,38 @@ const hasVarsToShow = computed(() => {
   return Object.keys(pinnedVariables.value).length > 0;
 });
 
-// Ajuster le style du card-text en fonction de la présence de variables épinglées
+// Ajuster le style du card-text en fonction de la présence de variables épinglées et des filtres de type
 const getCardTextStyle = () => {
   const baseStyle =
     "flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column;";
-
+  
+  // Hauteur de la card-title (64px) + hauteur de la card-subtitle des filtres (48px)
+  const filterHeight = "112px";
+  
   if (hasVarsToShow.value) {
-    return baseStyle + " max-height: calc(100% - 64px - 56px);";
+    // Ajouter la hauteur de la section des variables épinglées (56px)
+    return baseStyle + " max-height: calc(100% - " + filterHeight + " - 56px);";
   } else {
-    return baseStyle + " max-height: calc(100% - 64px);";
+    return baseStyle + " max-height: calc(100% - " + filterHeight + ");";
   }
 };
 
-// Messages filtrés par label
+// Messages filtrés par label, type et contenu
 const filteredMessages = computed(() => {
   console.log("Recalcul de filteredMessages");
   // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
   return socketStore.messages
     .filter((message) => message.label === props.label)
     .filter((message) => {
+      // Filtrer par type de message
+      return selectedTypes.value.includes(message.type || 'log-message');
+    })
+    .filter((message) => {
       // Si ce n'est pas un message de type variable, l'afficher normalement
       if (message.format !== "variable") {
         return true;
       }
-
+      
       // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
       const allVarsArePinned = Object.keys(message.variables).every((varName) =>
         isPinned(varName)
@@ -255,6 +309,43 @@ const filteredMessages = computed(() => {
       // Si toutes les variables sont épinglées, ne pas afficher le message
       return !allVarsArePinned;
     })
+    .filter((message) => {
+      // Si pas de filtre de contenu, afficher tous les messages
+      if (!contentFilter.value) return true;
+      
+      // Recherche dans le contenu du message
+      const filter = contentFilter.value.toLowerCase();
+      
+      // Pour les messages de format variable, vérifier dans le message et les variables
+      if (message.format === 'variable') {
+        // Vérifier dans le message
+        if (typeof message.msg === 'string' && message.msg.toLowerCase().includes(filter)) {
+          return true;
+        }
+        
+        // Vérifier dans les variables
+        if (message.variables) {
+          for (const [varName, value] of Object.entries(message.variables)) {
+            if (
+              varName.toLowerCase().includes(filter) || 
+              String(value).toLowerCase().includes(filter)
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      
+      // Pour les messages JSON
+      if (message.format === 'json' || isJsonData(message.msg)) {
+        const jsonString = JSON.stringify(message.jsonData || message.msg).toLowerCase();
+        return jsonString.includes(filter);
+      }
+      
+      // Pour les messages texte standards
+      return typeof message.msg === 'string' && message.msg.toLowerCase().includes(filter);
+    })
     .slice() // Créer une copie pour ne pas modifier le tableau original
     .reverse(); // Inverser pour que les messages les plus récents soient en bas
 });
@@ -262,42 +353,60 @@ const filteredMessages = computed(() => {
 // Variable pour mémoriser le dernier timestamp
 const lastMessageTimestamp = ref(0);
 
-// Fonction de défilement vers le bas (pour le bouton et les appels automatiques)
+// Fonction pour mettre à jour toutes les variables épinglées avec les valeurs les plus récentes
+const updateAllPinnedVariables = () => {
+  // On doit collecter les dernières valeurs des variables épinglées
+  const latestValues = {};
+  
+  // Parcourir tous les messages de ce label (non filtrés)
+  // Note: socketStore.messages est déjà trié avec les plus récents en premier
+  socketStore.messages
+    .filter(message => message.label === props.label && message.format === "variable")
+    .forEach(message => {
+      if (message.variables) {
+        Object.entries(message.variables).forEach(([varName, value]) => {
+          // Si la variable est épinglée et qu'on n'a pas encore sa dernière valeur
+          if (isPinned(varName) && !latestValues[varName]) {
+            latestValues[varName] = {
+              value,
+              timestamp: message.timestamp
+            };
+          }
+        });
+      }
+    });
+  
+  // Mettre à jour les variables épinglées avec les valeurs les plus récentes
+  Object.entries(latestValues).forEach(([varName, data]) => {
+    updatePinnedVariable(varName, data.value, data.timestamp);
+  });
+};
+
+// Appeler la fonction de mise à jour après chaque recalcul des messages filtrés
+watch(filteredMessages, () => {
+  updateAllPinnedVariables();
+});
+
+// Fonction de défilement vers le bas (toujours active)
 const scrollToBottom = (force = false) => {
-  console.log("scrollToBottom called with force =", force);
+  console.log("scrollToBottom called");
 
   if (virtualScroll.value) {
     const performScroll = () => {
       virtualScroll.value.scrollToIndex(filteredMessages.value.length - 1);
     };
 
-    if (force || autoScroll.value) {
-      // Exécution immédiate
-      performScroll();
-    }
+    // Exécution immédiate, toujours
+    performScroll();
   } else if (messagesContainer.value) {
     const performScroll = () => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
     };
 
-    if (force || autoScroll.value) {
-      performScroll();
-      nextTick(performScroll);
-      setTimeout(performScroll, 100);
-    }
-  }
-};
-
-// Détecter quand l'utilisateur fait défiler manuellement
-const handleScroll = () => {
-  if (!messagesContainer.value) return;
-
-  const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
-  const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // Marge de 20px
-
-  // Si l'utilisateur n'est pas près du bas, désactiver le défilement automatique
-  if (!isAtBottom) {
-    autoScroll.value = false;
+    // Toujours exécuter le défilement
+    performScroll();
+    nextTick(performScroll);
+    setTimeout(performScroll, 100);
   }
 };
 
@@ -428,19 +537,7 @@ onMounted(() => {
 
     // Essayer à nouveau après un délai pour s'assurer que tout est chargé
     setTimeout(() => scrollToBottom(true), 200);
-
-    // Ajouter un event listener pour détecter le défilement manuel
-    if (messagesContainer.value) {
-      messagesContainer.value.addEventListener("scroll", handleScroll);
-    }
   });
-});
-
-// Nettoyer l'event listener quand le composant est détruit
-onUnmounted(() => {
-  if (messagesContainer.value) {
-    messagesContainer.value.removeEventListener("scroll", handleScroll);
-  }
 });
 </script>
 
@@ -456,6 +553,7 @@ onUnmounted(() => {
 .message-item {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   margin-bottom: 2px;
+  font-family: 'Lucida Console', monospace;
 }
 
 .message-item.error-message {
@@ -559,5 +657,20 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column; /* Ordre normal - anciens en haut, nouveaux en bas */
   min-height: 100%;
+}
+
+.content-filter {
+  min-width: 100px;
+  max-width: 200px;
+  font-size: 0.875rem;
+}
+
+.type-filters {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.type-filters .v-chip {
+  margin: 0 4px;
 }
 </style>

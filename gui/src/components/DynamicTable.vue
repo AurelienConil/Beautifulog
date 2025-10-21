@@ -53,8 +53,37 @@
         class="column-container"
       >
         <div class="log-column">
-          <LogView :label="label" />
+          <LogView 
+            :label="label" 
+            @hide="hideLabel"
+          />
         </div>
+      </v-col>
+    </v-row>
+    
+    <!-- Bannière pour afficher les labels masqués -->
+    <v-row v-if="getHiddenLabelsInMessages.length > 0" class="mt-2">
+      <v-col cols="12">
+        <v-alert
+          variant="tonal"
+          color="info"
+          density="compact"
+          class="hidden-labels-alert"
+        >
+          <div class="d-flex align-center flex-wrap">
+            <span class="mr-2">Labels masqués:</span>
+            <v-chip
+              v-for="label in getHiddenLabelsInMessages"
+              :key="label"
+              size="small"
+              class="ma-1"
+              closable
+              @click:close="hiddenLabels = hiddenLabels.filter(l => l !== label)"
+            >
+              {{ label }}
+            </v-chip>
+          </div>
+        </v-alert>
       </v-col>
     </v-row>
 
@@ -111,6 +140,9 @@ const socketStore = useSocketStore();
 // Stocker l'ordre d'apparition des labels
 const labelOrder = ref([]);
 
+// Stocker les labels masqués temporairement
+const hiddenLabels = ref([]);
+
 // Suivre les nouveaux messages pour capturer les nouveaux labels dans leur ordre d'apparition
 watch(
   () => socketStore.messages.length,
@@ -121,17 +153,19 @@ watch(
       const latestMessage = socketStore.messages[0];
       if (
         latestMessage &&
-        latestMessage.label &&
-        !labelOrder.value.includes(latestMessage.label)
+        latestMessage.label
       ) {
-        // Ajouter le nouveau label à la fin de l'ordre (à droite)
-        labelOrder.value.push(latestMessage.label);
+        // Si le label n'est pas encore dans l'ordre, l'ajouter
+        if (!labelOrder.value.includes(latestMessage.label)) {
+          // Ajouter le nouveau label à la fin de l'ordre (à droite)
+          labelOrder.value.push(latestMessage.label);
+        }
       }
     }
   }
 );
 
-// Labels uniques extraits des messages, en préservant l'ordre d'apparition
+// Labels uniques extraits des messages, en préservant l'ordre d'apparition et en excluant les labels masqués
 const uniqueLabels = computed(() => {
   // Récupérer tous les labels des messages
   const currentLabels = new Set();
@@ -152,7 +186,8 @@ const uniqueLabels = computed(() => {
     ),
   ];
 
-  return result;
+  // Filtrer les labels masqués
+  return result.filter(label => !hiddenLabels.value.includes(label));
 });
 
 // Nombre d'erreurs total
@@ -182,6 +217,25 @@ const clearAllMessages = () => {
     socketStore.clearMessages();
   }
 };
+
+// Fonction pour masquer temporairement un label
+const hideLabel = (label) => {
+  hiddenLabels.value.push(label);
+};
+
+// Fonction pour vérifier si un label est dans les messages actuels mais masqué
+const getHiddenLabelsInMessages = computed(() => {
+  // Récupérer tous les labels des messages actuels
+  const currentLabels = new Set();
+  socketStore.messages.forEach((message) => {
+    if (message.label) {
+      currentLabels.add(message.label);
+    }
+  });
+  
+  // Retourner les labels qui sont à la fois dans les messages et dans hiddenLabels
+  return hiddenLabels.value.filter(label => currentLabels.has(label));
+});
 
 // Lifecycle
 onMounted(() => {
@@ -228,6 +282,10 @@ onUnmounted(() => {
   /* Contenir la log-view dans la hauteur disponible */
   max-height: 100%;
   overflow: hidden;
+}
+
+.hidden-labels-alert {
+  margin-bottom: 8px;
 }
 
 /* Responsive design pour mobile */

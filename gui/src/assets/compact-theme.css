@@ -1,0 +1,130 @@
+:root {
+  /* Tailles de texte par défaut (mode normal) */
+  --font-size-small: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;        /* 16px */
+  --font-size-large: 1.25rem;    /* 20px */
+  --font-size-xlarge: 1.5rem;    /* 24px */
+  
+  /* Espacements par défaut (mode normal) */
+  --spacing-xs: 0.5rem;    /* 8px */
+  --spacing-sm: 1rem;      /* 16px */
+  --spacing-md: 1.5rem;    /* 24px */
+  --spacing-lg: 2rem;      /* 32px */
+  
+  /* Hauteurs de ligne */
+  --line-height-compact: 1.4;
+  --line-height-base: 1.6;
+  
+  /* Marges des conteneurs */
+  --container-padding: 1.5rem;
+  
+  /* Transitions pour des changements fluides */
+  --transition-speed: 0.2s;
+}
+
+/* Variables pour le mode compact */
+.compact-mode {
+  /* Tailles de texte réduites */
+  --font-size-small: 0.75rem;   /* 12px */
+  --font-size-base: 0.875rem;   /* 14px */
+  --font-size-large: 1rem;      /* 16px */
+  --font-size-xlarge: 1.125rem; /* 18px */
+  
+  /* Espacements réduits */
+  --spacing-xs: 0.25rem;  /* 4px */
+  --spacing-sm: 0.5rem;   /* 8px */
+  --spacing-md: 0.75rem;  /* 12px */
+  --spacing-lg: 1rem;     /* 16px */
+  
+  /* Hauteur de ligne plus serrée */
+  --line-height-compact: 1.2;
+  --line-height-base: 1.4;
+  
+  /* Marges des conteneurs */
+  --container-padding: 0.5rem;
+}
+
+/* Styles spécifiques au mode compact pour les composants Vuetify */
+.compact-mode .v-btn {
+  --v-btn-height: 32px !important;
+}
+
+.compact-mode .v-btn--size-default {
+  --v-btn-height: 32px !important;
+}
+
+.compact-mode .v-input {
+  --v-input-control-height: 32px !important;
+}
+
+.compact-mode .v-field {
+  --v-field-input-padding-top: 6px !important;
+  --v-field-input-padding-bottom: 6px !important;
+}
+
+.compact-mode .v-list-item {
+  min-height: 36px !important;
+  padding: 0 12px !important;
+}
+
+.compact-mode .v-card-title {
+  padding: 12px !important;
+}
+
+.compact-mode .v-card-text {
+  padding: 12px !important;
+}
+
+.compact-mode .v-table .v-table__wrapper > table > thead > tr > th {
+  padding: 0 8px !important;
+  height: 36px !important;
+}
+
+.compact-mode .v-table .v-table__wrapper > table > tbody > tr > td {
+  padding: 0 8px !important;
+  height: 36px !important;
+}
+
+.compact-mode .v-container {
+  padding: 8px !important;
+}
+
+/* Classes utilitaires pour les espacements */
+.pa-compact {
+  padding: var(--spacing-sm) !important;
+}
+
+.ma-compact {
+  margin: var(--spacing-sm) !important;
+}
+
+.px-compact {
+  padding-left: var(--spacing-sm) !important;
+  padding-right: var(--spacing-sm) !important;
+}
+
+.py-compact {
+  padding-top: var(--spacing-sm) !important;
+  padding-bottom: var(--spacing-sm) !important;
+}
+
+.mx-compact {
+  margin-left: var(--spacing-sm) !important;
+  margin-right: var(--spacing-sm) !important;
+}
+
+.my-compact {
+  margin-top: var(--spacing-sm) !important;
+  margin-bottom: var(--spacing-sm) !important;
+}
+
+/* Modificateurs de taille de texte */
+.text-compact {
+  font-size: var(--font-size-base) !important;
+  line-height: var(--line-height-compact) !important;
+}
+
+.text-compact-small {
+  font-size: var(--font-size-small) !important;
+  line-height: var(--line-height-compact) !important;
+}

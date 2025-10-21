@@ -53,6 +53,12 @@
         </v-icon>
       </v-btn>
 
+      <v-btn icon @click="toggleCompactMode" class="mr-2 compact-mode-btn" v-tooltip="'Mode compact'">
+        <v-icon>{{
+          themeStore.isCompact ? "mdi-fullscreen-exit" : "mdi-fullscreen"
+        }}</v-icon>
+      </v-btn>
+      
       <v-btn icon @click="toggleTheme">
         <v-icon>{{
           isDark ? "mdi-white-balance-sunny" : "mdi-weather-night"
@@ -114,9 +120,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useTheme } from "vuetify";
 import { useSocketStore } from "./stores/socket.js";
+import { useThemeStore } from "./stores/theme.js";
 import WelcomeCard from "./components/WelcomeCard.vue";
 import FeatureCard from "./components/FeatureCard.vue";
 import SocketManager from "./components/SocketManager.vue";
@@ -126,8 +133,9 @@ import DynamicTable from "./components/DynamicTable.vue";
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === "dark");
 
-// Store
+// Stores
 const socketStore = useSocketStore();
+const themeStore = useThemeStore();
 
 // Gestion des modales
 const welcomeModal = ref(false);
@@ -140,6 +148,16 @@ const debugMessage = ref("");
 const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
 };
+
+// Fonction pour basculer entre les modes normal et compact
+const toggleCompactMode = () => {
+  themeStore.toggleCompactMode();
+};
+
+// Initialiser le thème au chargement
+onMounted(() => {
+  themeStore.initialize();
+});
 
 // Fonctions pour ouvrir les modales
 const openWelcomeModal = () => {
@@ -162,6 +180,108 @@ const addDebugMessage = () => {
   }
 };
 </script>
+
+<style>
+/* Styles globaux */
+:deep(.v-card-title) {
+  font-size: var(--font-size-large);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+:deep(.v-card-text) {
+  padding: var(--spacing-md);
+}
+
+:deep(.v-container) {
+  padding: var(--container-padding);
+}
+
+:deep(.v-dialog > .v-card > .v-card-text) {
+  padding-top: 0;
+}
+
+:deep(.v-list-item) {
+  min-height: auto;
+}
+
+:deep(.v-btn) {
+  text-transform: none;
+}
+
+:deep(.v-table) {
+  font-size: var(--font-size-base);
+}
+
+:deep(.v-data-table-header th) {
+  font-size: var(--font-size-base) !important;
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+}
+
+:deep(.v-data-table-row td) {
+  font-size: var(--font-size-base) !important;
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+}
+
+/* Ajustements des dimensions dans toute l'application avec transitions */
+:deep(.v-input) {
+  font-size: var(--font-size-base);
+  transition: font-size 0.3s, padding 0.3s, margin 0.3s;
+}
+
+:deep(.v-btn) {
+  font-size: var(--font-size-base);
+  transition: font-size 0.3s, padding 0.3s, margin 0.3s;
+}
+
+:deep(.v-list-item-title) {
+  font-size: var(--font-size-base);
+  transition: font-size 0.3s;
+}
+
+:deep(.v-list-item-subtitle) {
+  font-size: var(--font-size-small);
+  transition: font-size 0.3s;
+}
+
+:deep(.v-dialog > .v-card) {
+  padding: var(--spacing-sm);
+  transition: padding 0.3s;
+}
+
+/* Réduire l'espace entre les composants */
+:deep(.v-col) {
+  padding: var(--spacing-xs);
+  transition: padding 0.3s;
+}
+
+:deep(.v-row) {
+  margin: 0 calc(-1 * var(--spacing-xs));
+  transition: margin 0.3s;
+}
+
+/* Ajouter une indication visuelle pour le bouton de mode compact */
+.v-btn.compact-mode-btn {
+  position: relative;
+}
+
+.compact-mode-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--v-theme-primary);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.compact-mode .compact-mode-btn::after {
+  opacity: 1;
+}
+</style>
 
 <style scoped>
 .debug-input-container {
