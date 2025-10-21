@@ -4,7 +4,7 @@
  * Ne pas modifier directement - vos changements seront écrasés
  * Modifiez plutôt le fichier source: formatMessage.js
  * 
- * Dernière synchronisation: 2025-10-21T12:42:34.959Z
+ * Dernière synchronisation: 2025-10-21T14:00:29.223Z
  */
 
 /**
@@ -16,7 +16,7 @@
  * Formate un message string en objet structuré
  * @param {string} input - Le message à formatter
  * @param {Object} options - Options de formatage (pour usage futur)
- * @returns {Object} Objet formaté avec label, type, msg et timestamp
+ * @returns {Object} Objet formaté avec label, type, msg, format, variables et timestamp
  */
 function formatMessage(input, options = {}) {
     // Validation de l'input
@@ -40,6 +40,15 @@ function formatMessage(input, options = {}) {
     const typeResult = detectType(msgWithoutLabel, result.label);
     result.type = typeResult.type;
     result.msg = typeResult.msg;
+
+    // Détecter les variables
+    const variableResult = detectVariables(result.msg);
+    if (variableResult.hasVariables) {
+        result.format = "variable";
+        result.variables = variableResult.variables;
+    } else {
+        result.format = "string";
+    }
 
     // Ajouter le timestamp
     result.timestamp = new Date().toISOString();
@@ -104,6 +113,40 @@ function detectType(message, label) {
                 result.msg = result.msg.substring(1).trim();
             }
             break;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Détecte si le message contient des définitions de variables
+ * Formats supportés: "nom = valeur", "nom : valeur" avec séparation par virgules
+ * @param {string} message - Le message à analyser
+ * @returns {Object} Informations sur les variables détectées
+ */
+function detectVariables(message) {
+    const result = {
+        hasVariables: false,
+        variables: {}
+    };
+
+    // Séparation des potentielles multiples variables (séparées par des virgules)
+    const segments = message.split(',').map(s => s.trim());
+
+    for (const segment of segments) {
+        // Détection du format "nom = valeur"
+        let match = segment.match(/^([a-zA-Z0-9_]+)\s*=\s*([^=]+)$/);
+        if (!match) {
+            // Détection du format "nom : valeur"
+            match = segment.match(/^([a-zA-Z0-9_]+)\s*:\s*([^:]+)$/);
+        }
+
+        if (match) {
+            const name = match[1].trim();
+            const value = match[2].trim();
+            result.variables[name] = value;
+            result.hasVariables = true;
         }
     }
 

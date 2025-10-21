@@ -66,6 +66,7 @@ function createSocketServer() {
 
             try {
                 const formattedMessage = formatMessage(data);
+                console.log('Message formaté:', formattedMessage);
 
                 // Ajouter les métadonnées du socket
                 formattedMessage.socketId = socket.id;

@@ -105,18 +105,47 @@
             variant="outlined"
           >
             <div class="d-flex justify-space-between align-center">
-              <v-chip
-                :color="getMessageTypeColor(message.type)"
-                size="small"
-                variant="elevated"
-              >
-                {{ message.type }}
-              </v-chip>
+              <div class="d-flex align-center">
+                <v-chip
+                  :color="getMessageTypeColor(message.type)"
+                  size="small"
+                  variant="elevated"
+                  class="mr-2"
+                >
+                  {{ message.type }}
+                </v-chip>
+                <v-chip
+                  v-if="message.format === 'variable'"
+                  color="purple"
+                  size="small"
+                  variant="outlined"
+                >
+                  Variables
+                </v-chip>
+              </div>
               <small class="text-grey">{{
                 formatTime(message.timestamp)
               }}</small>
             </div>
-            <div class="mt-1">{{ JSON.stringify(message.msg) }}</div>
+            <div class="mt-1">
+              <template v-if="message.format === 'variable'">
+                <div>{{ message.msg }}</div>
+                <div class="mt-1 variables-container">
+                  <v-chip
+                    v-for="(value, name) in message.variables"
+                    :key="name"
+                    color="purple-lighten-5"
+                    size="small"
+                    class="mr-1 mb-1"
+                  >
+                    {{ name }}: {{ value }}
+                  </v-chip>
+                </div>
+              </template>
+              <template v-else>
+                {{ JSON.stringify(message.msg) }}
+              </template>
+            </div>
             <small class="text-grey">Client: {{ message.socketId }}</small>
           </v-card>
         </v-sheet>
@@ -211,6 +240,8 @@ const getMessageTypeColor = (type) => {
       return "success";
     case "error-message":
       return "error";
+    case "variable-message":
+      return "purple"; // Nouvelle couleur pour les messages de type variable
     default:
       return "info";
   }

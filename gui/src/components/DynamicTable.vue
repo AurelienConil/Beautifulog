@@ -49,7 +49,7 @@
       <v-col
         v-for="label in uniqueLabels"
         :key="label"
-        :cols="getColumnSize()"
+        :cols="auto"
         class="column-container"
       >
         <div class="log-column">
@@ -102,21 +102,57 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSocketStore } from "../stores/socket.js";
 import LogView from "./LogView.vue";
 
 const socketStore = useSocketStore();
 
-// Labels uniques extraits des messages
+// Stocker l'ordre d'apparition des labels
+const labelOrder = ref([]);
+
+// Suivre les nouveaux messages pour capturer les nouveaux labels dans leur ordre d'apparition
+watch(
+  () => socketStore.messages.length,
+  () => {
+    // Vérifier s'il y a des nouveaux messages
+    if (socketStore.messages.length > 0) {
+      // Prendre le dernier message ajouté (le premier dans le tableau, car ils sont ajoutés en début de liste)
+      const latestMessage = socketStore.messages[0];
+      if (
+        latestMessage &&
+        latestMessage.label &&
+        !labelOrder.value.includes(latestMessage.label)
+      ) {
+        // Ajouter le nouveau label à la fin de l'ordre (à droite)
+        labelOrder.value.push(latestMessage.label);
+      }
+    }
+  }
+);
+
+// Labels uniques extraits des messages, en préservant l'ordre d'apparition
 const uniqueLabels = computed(() => {
-  const labels = new Set();
+  // Récupérer tous les labels des messages
+  const currentLabels = new Set();
   socketStore.messages.forEach((message) => {
     if (message.label) {
-      labels.add(message.label);
+      currentLabels.add(message.label);
     }
   });
-  return Array.from(labels).sort();
+
+  // Filtrer labelOrder pour ne garder que les labels qui existent encore
+  // et ajouter les nouveaux labels qui pourraient ne pas être dans labelOrder
+  const result = [
+    // D'abord les labels connus dans leur ordre d'apparition
+    ...labelOrder.value.filter((label) => currentLabels.has(label)),
+    // Ensuite les nouveaux labels qui ne sont pas dans labelOrder
+    ...Array.from(currentLabels).filter(
+      (label) => !labelOrder.value.includes(label)
+    ),
+  ];
+
+  return result;
 });
 
 // Nombre d'erreurs total
@@ -152,6 +188,18 @@ onMounted(() => {
   console.log("DynamicTable monté");
   // Initialiser les écouteurs si ce n'est pas déjà fait
   socketStore.initializeSocketListeners();
+
+  // Initialiser labelOrder avec les labels existants lors du montage
+  // pour préserver l'ordre actuel et ne pas tout réorganiser
+  const existingLabels = new Set();
+  socketStore.messages.forEach((message) => {
+    if (message.label && !existingLabels.has(message.label)) {
+      existingLabels.add(message.label);
+      if (!labelOrder.value.includes(message.label)) {
+        labelOrder.value.push(message.label);
+      }
+    }
+  });
 });
 
 onUnmounted(() => {
