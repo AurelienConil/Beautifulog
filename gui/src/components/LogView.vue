@@ -1,7 +1,28 @@
 <template>
   <v-card class="log-view" height="100%">
     <v-card-title class="d-flex justify-space-between align-center">
-      <span>{{ label }}</span>
+      <div class="d-flex align-center">
+        <span>{{ label }}</span>
+        <v-btn
+          icon="mdi-arrow-down-bold-circle"
+          size="x-small"
+          variant="text"
+          class="ml-2"
+          title="Défiler vers le bas"
+          @click="scrollToBottom(true)"
+        ></v-btn>
+        <v-btn
+          :icon="autoScroll ? 'mdi-sync' : 'mdi-sync-off'"
+          size="x-small"
+          :color="autoScroll ? 'primary' : 'grey'"
+          variant="text"
+          class="ml-2"
+          :title="
+            autoScroll ? 'Défilement auto activé' : 'Défilement auto désactivé'
+          "
+          @click="toggleAutoScroll"
+        ></v-btn>
+      </div>
       <v-chip :color="getStatusColor()" size="small">
         {{ filteredMessages.length }} messages
       </v-chip>
@@ -25,8 +46,7 @@
           </template>
           <span class="font-weight-medium">{{ varName }}:</span>
           <span class="ml-1">{{ varInfo.value }}</span>
-          <template v-if="varInfo.updates > 0" v-slot:append>
-          </template>
+          <template v-if="varInfo.updates > 0" v-slot:append> </template>
           <v-tooltip activator="parent" location="bottom">
             Dernière mise à jour: {{ formatTimestamp(varInfo.timestamp) }}
             <br />
@@ -36,15 +56,24 @@
       </div>
     </v-card-subtitle>
 
-    <v-card-text class="pa-2" :style="getCardTextStyle()">
+    <v-card-text
+      class="pa-2 message-container"
+      :style="getCardTextStyle()"
+      ref="messagesContainer"
+    >
       <div v-if="filteredMessages.length === 0" class="text-center text-grey">
         Aucun message pour {{ label }}
       </div>
 
-      <div v-else>
-        <v-list density="compact" class="pa-0">
+      <div v-else class="messages-list" ref="messagesList">
+        <v-virtual-scroll
+          :items="filteredMessages"
+          item-height="50"
+          class="pa-0"
+          ref="virtualScroll"
+          v-slot="{ item: message }"
+        >
           <v-list-item
-            v-for="message in filteredMessages"
             :key="message.id"
             class="message-item"
             :class="getMessageClass(message)"
@@ -74,8 +103,12 @@
                   <pre v-if="isJsonData(message.msg)" class="json-data">{{
                     formatJson(message.msg)
                   }}</pre>
+                  <template v-else-if="message.format === 'json'">
+                    <div class="json-message">
+                      <JsonViewer :data="message.jsonData" />
+                    </div>
+                  </template>
                   <template v-else-if="message.format === 'variable'">
-                    <!-- Message avec variables cliquables -->
                     <div class="variable-message">
                       <span>{{ message.msg }}</span>
                       <div class="mt-1 variables-container">
@@ -107,15 +140,17 @@
               </v-list-item-title>
             </v-list-item-content>
           </v-list-item>
-        </v-list>
+        </v-virtual-scroll>
       </div>
     </v-card-text>
   </v-card>
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, watchEffect } from "vue";
 import { useSocketStore } from "../stores/socket.js";
+import JsonViewer from "./JsonViewer.vue";
+import { onMounted, onUnmounted, nextTick } from "vue";
 
 const props = defineProps({
   label: {
@@ -125,6 +160,22 @@ const props = defineProps({
 });
 
 const socketStore = useSocketStore();
+
+// Référence au conteneur des messages pour le défilement automatique
+const messagesContainer = ref(null);
+const messagesList = ref(null);
+const virtualScroll = ref(null);
+
+// État pour le défilement automatique
+const autoScroll = ref(true);
+
+// Toggle pour le défilement automatique
+const toggleAutoScroll = () => {
+  autoScroll.value = !autoScroll.value;
+  if (autoScroll.value) {
+    scrollToBottom(true);
+  }
+};
 
 // État local pour les variables épinglées
 const pinnedVariables = ref({});
@@ -174,15 +225,20 @@ const hasVarsToShow = computed(() => {
 
 // Ajuster le style du card-text en fonction de la présence de variables épinglées
 const getCardTextStyle = () => {
+  const baseStyle =
+    "flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column;";
+
   if (hasVarsToShow.value) {
-    return "height: calc(100% - 64px - 56px); overflow-y: auto";
+    return baseStyle + " max-height: calc(100% - 64px - 56px);";
   } else {
-    return "height: calc(100% - 64px); overflow-y: auto";
+    return baseStyle + " max-height: calc(100% - 64px);";
   }
 };
 
 // Messages filtrés par label
 const filteredMessages = computed(() => {
+  console.log("Recalcul de filteredMessages");
+  // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
   return socketStore.messages
     .filter((message) => message.label === props.label)
     .filter((message) => {
@@ -198,27 +254,68 @@ const filteredMessages = computed(() => {
 
       // Si toutes les variables sont épinglées, ne pas afficher le message
       return !allVarsArePinned;
-    });
+    })
+    .slice() // Créer une copie pour ne pas modifier le tableau original
+    .reverse(); // Inverser pour que les messages les plus récents soient en bas
 });
 
-// Observer les nouveaux messages pour mettre à jour les variables épinglées
-// Watch uniquement le dernier message reçu (messages[0]) pour éviter de reparcourir tout l'historique
-watch(
-  () => socketStore.messages[0],
-  (newMessage) => {
-    if (!newMessage) return;
+// Variable pour mémoriser le dernier timestamp
+const lastMessageTimestamp = ref(0);
 
-    // Ne traiter que les messages du label courant
-    if (newMessage.label !== props.label) return;
+// Fonction de défilement vers le bas (pour le bouton et les appels automatiques)
+const scrollToBottom = (force = false) => {
+  console.log("scrollToBottom called with force =", force);
 
-    // Si c'est un message contenant des variables, mettre à jour les variables épinglées correspondantes
-    if (newMessage.format === "variable" && newMessage.variables) {
-      for (const [varName, value] of Object.entries(newMessage.variables)) {
-        if (isPinned(varName)) {
-          updatePinnedVariable(varName, value, newMessage.timestamp);
-        }
-      }
+  if (virtualScroll.value) {
+    const performScroll = () => {
+      virtualScroll.value.scrollToIndex(filteredMessages.value.length - 1);
+    };
+
+    if (force || autoScroll.value) {
+      // Exécution immédiate
+      performScroll();
     }
+  } else if (messagesContainer.value) {
+    const performScroll = () => {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    };
+
+    if (force || autoScroll.value) {
+      performScroll();
+      nextTick(performScroll);
+      setTimeout(performScroll, 100);
+    }
+  }
+};
+
+// Détecter quand l'utilisateur fait défiler manuellement
+const handleScroll = () => {
+  if (!messagesContainer.value) return;
+
+  const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
+  const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // Marge de 20px
+
+  // Si l'utilisateur n'est pas près du bas, désactiver le défilement automatique
+  if (!isAtBottom) {
+    autoScroll.value = false;
+  }
+};
+
+watchEffect(() => {
+  console.log("filteredMessages Watch Effect :", filteredMessages.value);
+	//scroll to bottom in 200ms
+	setTimeout(() => {
+		scrollToBottom(true);
+	}, 200);
+});
+
+// Observer filteredMessages.length pour détecter les changements
+watch(
+  () => filteredMessages.length,
+  (newLength, oldLength) => {
+    console.log(
+      `filteredMessages.length a changé : ancien = ${oldLength}, nouveau = ${newLength}`
+    );
   }
 );
 
@@ -245,9 +342,11 @@ const getMessageClass = (message) => {
     "log-message": message.type === "log-message",
   };
 
-  // Ajouter la classe pour les messages de type variable
+  // Ajouter la classe pour les formats spéciaux
   if (message.format === "variable") {
     baseClasses["variable-message"] = true;
+  } else if (message.format === "json") {
+    baseClasses["json-message"] = true;
   }
 
   return baseClasses;
@@ -255,9 +354,11 @@ const getMessageClass = (message) => {
 
 // Icône pour le type de message
 const getMessageIcon = (message) => {
-  // Si c'est un message de type variable, utiliser l'icône variable
+  // Choisir l'icône en fonction du format
   if (message.format === "variable") {
     return "mdi-variable";
+  } else if (message.format === "json") {
+    return "mdi-code-json";
   }
 
   // Sinon, utiliser l'icône en fonction du type
@@ -277,9 +378,11 @@ const getMessageIcon = (message) => {
 
 // Couleur de l'icône
 const getMessageIconColor = (message) => {
-  // Si c'est un message de type variable, utiliser la couleur violet
+  // Choisir la couleur en fonction du format
   if (message.format === "variable") {
     return "purple";
+  } else if (message.format === "json") {
+    return "blue";
   }
 
   // Sinon, utiliser la couleur en fonction du type
@@ -316,11 +419,38 @@ const isJsonData = (msg) => {
 const formatJson = (msg) => {
   return JSON.stringify(msg, null, 2);
 };
+
+// Défiler vers le bas au chargement initial
+onMounted(() => {
+  nextTick(() => {
+    // Défiler vers le bas après le rendu initial
+    scrollToBottom(true);
+
+    // Essayer à nouveau après un délai pour s'assurer que tout est chargé
+    setTimeout(() => scrollToBottom(true), 200);
+
+    // Ajouter un event listener pour détecter le défilement manuel
+    if (messagesContainer.value) {
+      messagesContainer.value.addEventListener("scroll", handleScroll);
+    }
+  });
+});
+
+// Nettoyer l'event listener quand le composant est détruit
+onUnmounted(() => {
+  if (messagesContainer.value) {
+    messagesContainer.value.removeEventListener("scroll", handleScroll);
+  }
+});
 </script>
 
 <style scoped>
 .log-view {
   border: 1px solid rgba(0, 0, 0, 0.12);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .message-item {
@@ -403,9 +533,31 @@ const formatJson = (msg) => {
   background-color: rgba(103, 58, 183, 0.05);
 }
 
+.json-message {
+  padding: 8px;
+  border-radius: 4px;
+  background-color: rgba(33, 150, 243, 0.05);
+  margin: 4px 0;
+  border-left: 3px solid rgba(33, 150, 243, 0.3);
+}
+
 .variables-container {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.message-container {
+  position: relative;
+  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  overflow-anchor: auto; /* Aide à maintenir la position de défilement lors de l'ajout de contenu */
+}
+
+.messages-list {
+  display: flex;
+  flex-direction: column; /* Ordre normal - anciens en haut, nouveaux en bas */
+  min-height: 100%;
 }
 </style>

@@ -32,13 +32,28 @@ function formatMessage(input, options = {}) {
     result.type = typeResult.type;
     result.msg = typeResult.msg;
 
-    // Détecter les variables
-    const variableResult = detectVariables(result.msg);
-    if (variableResult.hasVariables) {
-        result.format = "variable";
-        result.variables = variableResult.variables;
+    // Vérifier d'abord si le message ressemble à du JSON (commence et finit par des accolades)
+    const trimmedMsg = result.msg.trim();
+    const looksLikeJSON = trimmedMsg.startsWith('{') && trimmedMsg.endsWith('}');
+
+    if (looksLikeJSON) {
+        // Essayer de parser comme JSON
+        try {
+            result.jsonData = JSON.parse(result.msg);
+            result.format = "json";
+        } catch (e) {
+            // Si l'analyse JSON échoue, traiter comme string (pas comme variable)
+            result.format = "string";
+        }
     } else {
-        result.format = "string";
+        // Détecter les variables seulement si ça ne ressemble pas à du JSON
+        const variableResult = detectVariables(result.msg);
+        if (variableResult.hasVariables) {
+            result.format = "variable";
+            result.variables = variableResult.variables;
+        } else {
+            result.format = "string";
+        }
     }
 
     // Ajouter le timestamp
@@ -113,6 +128,10 @@ function detectType(message, label) {
 /**
  * Détecte si le message contient des définitions de variables
  * Formats supportés: "nom = valeur", "nom : valeur" avec séparation par virgules
+ * Règles: 
+ * - Une valeur peut être un nombre ou un string suivi d'une virgule
+ * - Une valeur peut être un nombre suivi d'un seul mot (unité)
+ * - Si après = ou : il y a plusieurs mots sans virgule, ce n'est pas une variable
  * @param {string} message - Le message à analyser
  * @returns {Object} Informations sur les variables détectées
  */
@@ -136,12 +155,46 @@ function detectVariables(message) {
         if (match) {
             const name = match[1].trim();
             const value = match[2].trim();
-            result.variables[name] = value;
-            result.hasVariables = true;
+
+            // Vérifier si la valeur est valide selon nos nouvelles règles
+            const isValidVariable = (
+                // Règle 1: Un nombre seul
+                /^\d+(\.\d+)?$/.test(value) ||
+
+                // Règle 2: Un nombre suivi d'un seul mot (unité)
+                /^\d+(\.\d+)?\s+\w+$/.test(value) ||
+
+                // Règle 3: Une chaîne sans espace (un seul "mot")
+                /^"[^"]*"$/.test(value) || /^'[^']*'$/.test(value) || /^[^\s]+$/.test(value)
+            );
+
+            if (isValidVariable) {
+                result.variables[name] = value;
+                result.hasVariables = true;
+            }
         }
     }
 
     return result;
+}
+
+/**
+ * Vérifie si une chaîne de caractères est un JSON valide
+ * @param {string} str - La chaîne à vérifier
+ * @returns {boolean} true si la chaîne est un JSON valide, false sinon
+ */
+function isValidJSON(str) {
+    // Vérifier si la chaîne contient au moins des accolades
+    if (!str.trim().startsWith('{') || !str.trim().endsWith('}')) {
+        return false;
+    }
+
+    try {
+        JSON.parse(str);
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 module.exports = {

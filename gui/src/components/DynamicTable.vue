@@ -1,38 +1,38 @@
 <template>
-  <v-container fluid class="dynamic-table pa-4">
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title class="d-flex justify-space-between align-center">
-            <span>Vue des Logs par Process</span>
-            <div class="d-flex align-center">
-              <v-chip color="primary" size="small" class="mr-2">
-                {{ uniqueLabels.length }} process{{
-                  uniqueLabels.length > 1 ? "us" : ""
-                }}
-              </v-chip>
-              <v-btn
-                icon="mdi-refresh"
-                size="small"
-                @click="refreshData"
-                variant="text"
-              />
-              <v-btn
-                icon="mdi-delete-sweep"
-                size="small"
-                @click="clearAllMessages"
-                variant="text"
-                color="error"
-              />
-            </div>
-          </v-card-title>
-        </v-card>
+  <v-container fluid class="dynamic-table pa-4" style="height: 100%">
+    <v-row class="my-0 py-0">
+      <v-col cols="12" class="py-0">
+      <v-card>
+        <v-card-title class="d-flex justify-space-between align-center">
+        <h3>Vue des Logs par Process</h3>
+        <div class="d-flex align-center">
+          <v-chip color="primary" size="small" class="mr-2">
+          {{ uniqueLabels.length }} process{{
+            uniqueLabels.length > 1 ? "us" : ""
+          }}
+          </v-chip>
+          <v-btn
+          icon="mdi-refresh"
+          size="small"
+          @click="refreshData"
+          variant="text"
+          />
+          <v-btn
+          icon="mdi-delete-sweep"
+          size="small"
+          @click="clearAllMessages"
+          variant="text"
+          color="error"
+          />
+        </div>
+        </v-card-title>
+      </v-card>
       </v-col>
     </v-row>
 
-    <v-row v-if="uniqueLabels.length === 0" class="mt-4">
-      <v-col cols="12">
-        <v-card class="text-center pa-8">
+    <v-row v-if="uniqueLabels.length === 0" class="mt-0 py-0">
+      <v-col cols="12" class="pt-2">
+        <v-card class="text-center pa-4">
           <v-icon size="64" color="grey-lighten-1" class="mb-4">
             mdi-inbox-outline
           </v-icon>
@@ -45,11 +45,11 @@
       </v-col>
     </v-row>
 
-    <v-row v-else class="mt-4">
+    <v-row v-else class="mt-4 flex-grow-1">
       <v-col
         v-for="label in uniqueLabels"
         :key="label"
-        :cols="auto"
+        :cols="getColumnSize()"
         class="column-container"
       >
         <div class="log-column">
@@ -59,7 +59,7 @@
     </v-row>
 
     <!-- Statistiques -->
-    <v-row class="mt-4">
+    <v-row class="mt-4" v-if="socketStore.debugMode">
       <v-col cols="12">
         <v-card>
           <v-card-title>Statistiques</v-card-title>
@@ -209,18 +209,25 @@ onUnmounted(() => {
 
 <style scoped>
 .dynamic-table {
-  min-height: 100%;
-  /* Suppression de height: 100vh et overflow-y: auto */
+  margin-top: 0px;
+  height: 95%;
+  display: flex;
+  flex-direction: column;
 }
 
 .column-container {
-  height: 600px;
+  height: 70vh; /* Utiliser vh plutôt qu'une hauteur fixe en pixels */
   padding: 8px;
+  /* Empêcher le débordement */
+  overflow: hidden;
 }
 
 .log-column {
   height: 100%;
   width: 100%;
+  /* Contenir la log-view dans la hauteur disponible */
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /* Responsive design pour mobile */

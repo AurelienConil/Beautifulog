@@ -122,6 +122,14 @@
                 >
                   Variables
                 </v-chip>
+                <v-chip
+                  v-if="message.format === 'json'"
+                  color="blue"
+                  size="small"
+                  variant="outlined"
+                >
+                  JSON
+                </v-chip>
               </div>
               <small class="text-grey">{{
                 formatTime(message.timestamp)
@@ -141,6 +149,21 @@
                     {{ name }}: {{ value }}
                   </v-chip>
                 </div>
+              </template>
+              <template v-else-if="message.format === 'json'">
+                <div>
+                  <v-chip
+                    color="blue"
+                    size="small"
+                    variant="outlined"
+                    class="mb-2"
+                  >
+                    JSON
+                  </v-chip>
+                </div>
+                <pre class="json-container">{{
+                  JSON.stringify(message.jsonData, null, 2)
+                }}</pre>
               </template>
               <template v-else>
                 {{ JSON.stringify(message.msg) }}
@@ -242,6 +265,8 @@ const getMessageTypeColor = (type) => {
       return "error";
     case "variable-message":
       return "purple"; // Nouvelle couleur pour les messages de type variable
+    case "json-message":
+      return "blue"; // Nouvelle couleur pour les messages de type JSON
     default:
       return "info";
   }
@@ -272,5 +297,16 @@ onUnmounted(() => {
 <style scoped>
 .gap-2 {
   gap: 8px;
+}
+
+.json-container {
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 150px;
+  overflow-y: auto;
 }
 </style>

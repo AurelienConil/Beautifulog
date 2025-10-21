@@ -121,4 +121,86 @@ try {
     console.log('❌ Erreur:', error.message, '\n');
 }
 
+// Test 12: Message service avec deux points suivi de texte (ne devrait pas être détecté comme variable)
+try {
+    console.log('Test 12: Message service avec deux points suivi de texte');
+    const result12 = formatMessage('AnalyzerService: Restarting analyzer 1');
+    console.log('Résultat:', result12);
+    console.log('Format:', result12.format);
+    if (result12.format === "string") {
+        console.log('✅ Succès - Correctement identifié comme string et non comme variable\n');
+    } else {
+        console.log('❌ Échec - Détecté comme', result12.format, 'au lieu de string\n');
+    }
+} catch (error) {
+    console.log('❌ Erreur:', error.message, '\n');
+}
+
+// Test 13: Message avec valeur numérique suivie d'une unité (devrait être détecté comme variable)
+try {
+    console.log('Test 13: Message avec valeur numérique suivie d\'une unité');
+    const result13 = formatMessage('[SENSOR] temperature = 25 C, humidity = 78 %');
+    console.log('Résultat:', result13);
+    console.log('Format:', result13.format);
+    console.log('Variables:', result13.variables);
+    if (result13.format === "variable" &&
+        result13.variables.temperature === "25 C" &&
+        result13.variables.humidity === "78 %") {
+        console.log('✅ Succès - Correctement identifié les variables avec unités\n');
+    } else {
+        console.log('❌ Échec - Variables avec unités non détectées correctement\n');
+    }
+} catch (error) {
+    console.log('❌ Erreur:', error.message, '\n');
+}
+
+// Test 14: Message au format JSON simple
+try {
+    console.log('Test 14: Message au format JSON simple');
+    const result14 = formatMessage('{"name": "test", "value": 123}');
+    console.log('Résultat:', result14);
+    console.log('Format:', result14.format);
+    if (result14.format === "json" &&
+        result14.jsonData.name === "test" &&
+        result14.jsonData.value === 123) {
+        console.log('✅ Succès - Correctement identifié comme JSON\n');
+    } else {
+        console.log('❌ Échec - JSON non détecté correctement\n');
+    }
+} catch (error) {
+    console.log('❌ Erreur:', error.message, '\n');
+}
+
+// Test 15: Message au format JSON plus complexe
+try {
+    console.log('Test 15: Message au format JSON complexe');
+    const result15 = formatMessage('{"sensor": {"id": "temp-01", "readings": [21.5, 22.1, 22.3], "status": "active"}}');
+    console.log('Résultat:', result15);
+    console.log('Format:', result15.format);
+    if (result15.format === "json" &&
+        result15.jsonData.sensor.id === "temp-01" &&
+        Array.isArray(result15.jsonData.sensor.readings)) {
+        console.log('✅ Succès - Correctement identifié comme JSON complexe\n');
+    } else {
+        console.log('❌ Échec - JSON complexe non détecté correctement\n');
+    }
+} catch (error) {
+    console.log('❌ Erreur:', error.message, '\n');
+}
+
+// Test 16: JSON mal formé (devrait être traité comme une chaîne normale)
+try {
+    console.log('Test 16: JSON mal formé');
+    const result16 = formatMessage('{"name": "test", value: 123}');  // virgule manquante
+    console.log('Résultat:', result16);
+    console.log('Format:', result16.format);
+    if (result16.format === "string") {
+        console.log('✅ Succès - JSON mal formé correctement identifié comme string\n');
+    } else {
+        console.log('❌ Échec - JSON mal formé non détecté correctement\n');
+    }
+} catch (error) {
+    console.log('❌ Erreur:', error.message, '\n');
+}
+
 console.log('=== Fin des tests ===');
