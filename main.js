@@ -34,6 +34,9 @@ function createWindow() {
         mainWindow.loadFile('dist/index.html');
     }
 
+    // Définir le facteur de zoom à 50%
+    mainWindow.webContents.setZoomFactor(0.5);
+
     // Afficher la fenêtre quand elle est prête
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
@@ -72,7 +75,7 @@ function createSocketServer() {
 
             try {
                 const formattedMessages = formatMessage(data);
-                console.log('Message formaté:', formattedMessage);
+                //console.log('Message formaté:', formattedMessage);
 
                 formattedMessages.forEach(formattedMessage => {
                     // Ajouter les métadonnées du socket

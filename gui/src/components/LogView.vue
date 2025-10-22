@@ -1,58 +1,65 @@
 <template>
   <v-card class="log-view" height="100%">
     <v-card-title class="d-flex justify-space-between align-center">
-      <div class="d-flex align-center">
-        <span>{{ label }}</span>
-        <v-btn
-          icon="mdi-arrow-down-bold-circle"
-          size="x-small"
-          variant="text"
-          class="ml-2"
-          title="Défiler vers le bas"
-          @click="scrollToBottom(true)"
-        ></v-btn>
-        <v-btn
-          icon="mdi-close"
-          size="x-small"
-          variant="text"
-          color="grey"
-          class="ml-2"
-          title="Masquer cette colonne"
-          @click="hideColumn"
-        ></v-btn>
-      </div>
-       <v-chip-group
-        v-model="selectedTypes"
-        column
-        multiple
-        class="type-filters"
-      >
-        <v-chip
-          v-for="type in messageTypes"
-          :key="type.value"
-          :value="type.value"
-          filter
-          variant="outlined"
-          :color="type.color"
-          size="small"
-        >
-          <v-icon start size="x-small" :color="type.color">{{ type.icon }}</v-icon>
-        </v-chip>
-      </v-chip-group>
-      <div class="d-flex align-center">
-        <v-text-field
-          v-model="contentFilter"
-          placeholder="Filtrer le contenu"
-          variant="outlined"
-          density="compact"
-          hide-details
-          class="content-filter mr-2"
-          prepend-inner-icon="mdi-filter-outline"
-          clearable
-        ></v-text-field>
-      </div>
+      <v-expansion-panels>
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            <span>{{ label }}</span>
+            <v-btn
+              icon="mdi-arrow-down-bold-circle"
+              size="x-small"
+              variant="text"
+              class="ml-2"
+              title="Défiler vers le bas"
+              @click="scrollToBottom(true)"
+            ></v-btn>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-chip-group
+              v-model="selectedTypes"
+              column
+              multiple
+              class="type-filters"
+            >
+              <v-chip
+                v-for="type in messageTypes"
+                :key="type.value"
+                :value="type.value"
+                filter
+                variant="outlined"
+                :color="type.color"
+                size="small"
+              >
+                <v-icon start size="x-small" :color="type.color">{{
+                  type.icon
+                }}</v-icon>
+              </v-chip>
+            </v-chip-group>
+            <div class="d-flex align-center">
+              <v-text-field
+                v-model="contentFilter"
+                placeholder="Filtrer le contenu"
+                variant="outlined"
+                density="compact"
+                hide-details
+                class="content-filter mr-2"
+                prepend-inner-icon="mdi-filter-outline"
+                clearable
+              ></v-text-field>
+            </div>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
+      <v-btn
+        icon="mdi-close"
+        size="x-small"
+        variant="text"
+        color="grey"
+        class="ml-2"
+        title="Masquer cette colonne"
+        @click="hideColumn"
+      ></v-btn>
     </v-card-title>
-    
 
     <!-- Section des variables épinglées -->
     <v-card-subtitle v-if="hasVarsToShow" class="pinned-vars-panel pa-2">
@@ -123,8 +130,10 @@
                   ></v-btn>
                 </template>
                 <div>
-                  <strong>Timestamp:</strong> {{ formatTimestamp(message.timestamp) }}<br>
-                  <strong>Socket ID:</strong> {{ message.socketId ? message.socketId : 'N/A' }}
+                  <strong>Timestamp:</strong>
+                  {{ formatTimestamp(message.timestamp) }}<br />
+                  <strong>Socket ID:</strong>
+                  {{ message.socketId ? message.socketId : "N/A" }}
                 </div>
               </v-tooltip>
             </template>
@@ -192,11 +201,11 @@ const props = defineProps({
 });
 
 // Définir les événements émis par ce composant
-const emit = defineEmits(['hide']);
+const emit = defineEmits(["hide"]);
 
 // Fonction pour émettre l'événement de masquage de la colonne
 const hideColumn = () => {
-  emit('hide', props.label);
+  emit("hide", props.label);
 };
 
 const socketStore = useSocketStore();
@@ -210,18 +219,38 @@ const virtualScroll = ref(null);
 const autoScroll = true; // Changé de ref(true) à une constante fixe
 
 // Filtre pour le contenu des messages
-const contentFilter = ref('');
+const contentFilter = ref("");
 
 // Types de messages disponibles
 const messageTypes = [
-  { label: 'INFO', value: 'info-message', color: 'info', icon: 'mdi-information' },
-  { label: 'WARNING', value: 'warning-message', color: 'warning', icon: 'mdi-alert' },
-  { label: 'ERROR', value: 'error-message', color: 'error', icon: 'mdi-alert-circle' },
-  { label: 'LOG', value: 'log-message', color: 'primary', icon: 'mdi-note-text' }
+  {
+    label: "INFO",
+    value: "info-message",
+    color: "info",
+    icon: "mdi-information",
+  },
+  {
+    label: "WARNING",
+    value: "warning-message",
+    color: "warning",
+    icon: "mdi-alert",
+  },
+  {
+    label: "ERROR",
+    value: "error-message",
+    color: "error",
+    icon: "mdi-alert-circle",
+  },
+  {
+    label: "LOG",
+    value: "log-message",
+    color: "primary",
+    icon: "mdi-note-text",
+  },
 ];
 
 // Types de messages sélectionnés (tous par défaut)
-const selectedTypes = ref(messageTypes.map(type => type.value));
+const selectedTypes = ref(messageTypes.map((type) => type.value));
 
 // État local pour les variables épinglées
 const pinnedVariables = ref({});
@@ -273,10 +302,10 @@ const hasVarsToShow = computed(() => {
 const getCardTextStyle = () => {
   const baseStyle =
     "flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column;";
-  
+
   // Hauteur de la card-title (64px) + hauteur de la card-subtitle des filtres (48px)
   const filterHeight = "112px";
-  
+
   if (hasVarsToShow.value) {
     // Ajouter la hauteur de la section des variables épinglées (56px)
     return baseStyle + " max-height: calc(100% - " + filterHeight + " - 56px);";
@@ -293,14 +322,14 @@ const filteredMessages = computed(() => {
     .filter((message) => message.label === props.label)
     .filter((message) => {
       // Filtrer par type de message
-      return selectedTypes.value.includes(message.type || 'log-message');
+      return selectedTypes.value.includes(message.type || "log-message");
     })
     .filter((message) => {
       // Si ce n'est pas un message de type variable, l'afficher normalement
       if (message.format !== "variable") {
         return true;
       }
-      
+
       // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
       const allVarsArePinned = Object.keys(message.variables).every((varName) =>
         isPinned(varName)
@@ -312,22 +341,25 @@ const filteredMessages = computed(() => {
     .filter((message) => {
       // Si pas de filtre de contenu, afficher tous les messages
       if (!contentFilter.value) return true;
-      
+
       // Recherche dans le contenu du message
       const filter = contentFilter.value.toLowerCase();
-      
+
       // Pour les messages de format variable, vérifier dans le message et les variables
-      if (message.format === 'variable') {
+      if (message.format === "variable") {
         // Vérifier dans le message
-        if (typeof message.msg === 'string' && message.msg.toLowerCase().includes(filter)) {
+        if (
+          typeof message.msg === "string" &&
+          message.msg.toLowerCase().includes(filter)
+        ) {
           return true;
         }
-        
+
         // Vérifier dans les variables
         if (message.variables) {
           for (const [varName, value] of Object.entries(message.variables)) {
             if (
-              varName.toLowerCase().includes(filter) || 
+              varName.toLowerCase().includes(filter) ||
               String(value).toLowerCase().includes(filter)
             ) {
               return true;
@@ -336,15 +368,20 @@ const filteredMessages = computed(() => {
         }
         return false;
       }
-      
+
       // Pour les messages JSON
-      if (message.format === 'json' || isJsonData(message.msg)) {
-        const jsonString = JSON.stringify(message.jsonData || message.msg).toLowerCase();
+      if (message.format === "json" || isJsonData(message.msg)) {
+        const jsonString = JSON.stringify(
+          message.jsonData || message.msg
+        ).toLowerCase();
         return jsonString.includes(filter);
       }
-      
+
       // Pour les messages texte standards
-      return typeof message.msg === 'string' && message.msg.toLowerCase().includes(filter);
+      return (
+        typeof message.msg === "string" &&
+        message.msg.toLowerCase().includes(filter)
+      );
     })
     .slice() // Créer une copie pour ne pas modifier le tableau original
     .reverse(); // Inverser pour que les messages les plus récents soient en bas
@@ -357,25 +394,28 @@ const lastMessageTimestamp = ref(0);
 const updateAllPinnedVariables = () => {
   // On doit collecter les dernières valeurs des variables épinglées
   const latestValues = {};
-  
+
   // Parcourir tous les messages de ce label (non filtrés)
   // Note: socketStore.messages est déjà trié avec les plus récents en premier
   socketStore.messages
-    .filter(message => message.label === props.label && message.format === "variable")
-    .forEach(message => {
+    .filter(
+      (message) =>
+        message.label === props.label && message.format === "variable"
+    )
+    .forEach((message) => {
       if (message.variables) {
         Object.entries(message.variables).forEach(([varName, value]) => {
           // Si la variable est épinglée et qu'on n'a pas encore sa dernière valeur
           if (isPinned(varName) && !latestValues[varName]) {
             latestValues[varName] = {
               value,
-              timestamp: message.timestamp
+              timestamp: message.timestamp,
             };
           }
         });
       }
     });
-  
+
   // Mettre à jour les variables épinglées avec les valeurs les plus récentes
   Object.entries(latestValues).forEach(([varName, data]) => {
     updatePinnedVariable(varName, data.value, data.timestamp);
@@ -412,10 +452,10 @@ const scrollToBottom = (force = false) => {
 
 watchEffect(() => {
   console.log("filteredMessages Watch Effect :", filteredMessages.value);
-	//scroll to bottom in 200ms
-	setTimeout(() => {
-		scrollToBottom(true);
-	}, 200);
+  //scroll to bottom in 200ms
+  setTimeout(() => {
+    scrollToBottom(true);
+  }, 200);
 });
 
 // Observer filteredMessages.length pour détecter les changements
@@ -553,7 +593,7 @@ onMounted(() => {
 .message-item {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   margin-bottom: 2px;
-  font-family: 'Lucida Console', monospace;
+  font-family: "Lucida Console", monospace;
 }
 
 .message-item.error-message {

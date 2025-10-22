@@ -195,6 +195,7 @@ const openHelpModal = () => {
 
 // Fonction pour ajouter un message de debug
 const addDebugMessage = () => {
+  helpModal.value = false;
   if (debugMessage.value.trim()) {
     socketStore.addDebugMessage(debugMessage.value.trim());
     debugMessage.value = "";

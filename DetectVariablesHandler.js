@@ -8,6 +8,9 @@ class DetectVariablesHandler extends ChainHandler {
             itemToAdd.push(...this.detectVariables(item));
         });
 
+        //Remove item with item.msg empty
+        data = data.filter(item => item.msg && item.msg.length > 0);
+
         itemToAdd.forEach(newItem => {
             data.push(newItem);
         });
@@ -19,7 +22,10 @@ class DetectVariablesHandler extends ChainHandler {
 
 
         // Séparation des potentielles multiples variables (séparées par des virgules)
-        const segments = item.msg.split(',').map(s => s.trim());
+        const rawsegments = item.msg.split(',').map(s => s.trim());
+
+        //Remove empty segments
+        const segments = rawsegments.filter(s => s.length > 0);
 
         // Transform sgments into array of objects with 2 field : segment and hasVariables
         const segmentObjects = segments.map(segment => ({
