@@ -4,8 +4,8 @@
     "description": "An Electron application with Vue 3 and Vuetify",
     "main": "main.js",
     "scripts": {
-        "dev": "node scripts/pre-build.js && vite",
-        "build": "node scripts/pre-build.js && vite build",
+        "dev": "vite",
+        "build": "vite build",
         "preview": "vite preview",
         "start": "npm run build && electron .",
         "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",

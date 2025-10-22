@@ -38,7 +38,7 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
-    
+
     // Gestionnaire d'événement pour la fermeture de la fenêtre
     mainWindow.on('close', () => {
         console.log('Fenêtre principale fermée, arrêt de l\'application...');
@@ -71,13 +71,23 @@ function createSocketServer() {
             console.log('Message reçu via Socket.IO:', data);
 
             try {
-                const formattedMessage = formatMessage(data);
+                const formattedMessages = formatMessage(data);
                 console.log('Message formaté:', formattedMessage);
 
-                // Ajouter les métadonnées du socket
-                formattedMessage.socketId = socket.id;
-                formattedMessage.receivedAt = new Date().toISOString();
-                formattedMessage.clientCount = socketServer.engine.clientsCount;
+                formattedMessages.forEach(formattedMessage => {
+                    // Ajouter les métadonnées du socket
+                    formattedMessage.socketId = socket.id;
+                    formattedMessage.receivedAt = new Date().toISOString();
+                    formattedMessage.clientCount = socketServer.engine.clientsCount;
+
+
+                    // Transmettre le message au frontend via IPC
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('socket-message-received', formattedMessage);
+                    }
+                });
+
+                // Voici le format de formattedMessage:         
 
                 //Voici le format de formattedMessage:
                 /*
@@ -93,10 +103,7 @@ function createSocketServer() {
                  */
 
 
-                // Transmettre le message au frontend via IPC
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('socket-message-received', formattedMessage);
-                }
+
             } catch (error) {
                 console.error('Erreur lors du formatage du message:', error.message);
             }
@@ -152,6 +159,31 @@ function setupIpcHandlers() {
         }
         return [];
     });
+
+    // Handler pour recevoir un message du frontend et le traiter
+    ipcMain.handle('send-message-to-backend', async (event, message) => {
+        console.log('Message reçu du frontend via IPC:', message);
+
+        try {
+            // Utiliser la fonction formatMessage pour traiter le message
+            const formattedMessages = formatMessage(message);
+
+            // Ajouter des métadonnées supplémentaires
+            const enrichedMessages = formattedMessages.map((formattedMessage) => ({
+                ...formattedMessage,
+                processedAt: new Date().toISOString(),
+                source: 'backend'
+            }));
+
+            console.log('Messages formatés et enrichis:', enrichedMessages);
+
+            // Retourner les messages formatés au frontend
+            return enrichedMessages;
+        } catch (error) {
+            console.error('Erreur lors du traitement du message:', error);
+            throw new Error('Erreur lors du traitement du message');
+        }
+    });
 }
 
 // Cette méthode sera appelée quand Electron aura fini
@@ -168,7 +200,7 @@ app.on('window-all-closed', () => {
     if (socketServer) {
         socketServer.close();
     }
-    
+
     // Quitter l'application même sur macOS
     app.quit();
 });

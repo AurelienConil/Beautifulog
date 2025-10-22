@@ -36,7 +36,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Retirer les écouteurs
         removeAllListeners: (channel) => {
             ipcRenderer.removeAllListeners(channel);
-        }
+        },
+
+        // Envoyer un message au backend
+        sendMessageToBackend: (message) => ipcRenderer.invoke('send-message-to-backend', message),
     }
 });
 

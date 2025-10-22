@@ -5,9 +5,10 @@ console.log('=== Tests du module formatMessage ===\n');
 
 // Test 1: Message simple
 try {
-    console.log('Test 1: Message simple');
-    const result1 = formatMessage('Ceci est un message simple');
-    console.log('Résultat:', result1);
+    let msg = 'Ceci est un message simple';
+    console.log('Test 1: ', msg);
+    const result1 = formatMessage(msg);
+    console.log('result', result1);
     console.log('✅ Succès\n');
 } catch (error) {
     console.log('❌ Erreur:', error.message, '\n');
@@ -76,10 +77,8 @@ try {
 // Test 8: Message avec une variable (format =)
 try {
     console.log('Test 8: Message avec une variable (format =)');
-    const result8 = formatMessage('[SYSTEM] temperature = 25.4');
+    const result8 = formatMessage('[SYSTEM] chauffage en cours,  temperature = 25.4');
     console.log('Résultat:', result8);
-    console.log('Format:', result8.format);
-    console.log('Variables:', result8.variables);
     console.log('✅ Succès\n');
 } catch (error) {
     console.log('❌ Erreur:', error.message, '\n');

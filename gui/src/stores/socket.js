@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { formatMessage } from '../utils/formatMessage.js'
 
 export const useSocketStore = defineStore('socket', () => {
     // État
@@ -80,6 +79,12 @@ export const useSocketStore = defineStore('socket', () => {
             console.error('Erreur lors de la récupération du statut du serveur:', error)
             return null
         }
+    }
+
+    const addMessages = (messageArray) => {
+        messageArray.forEach(messageData => {
+            addMessage(messageData)
+        })
     }
 
     const addMessage = (messageData) => {
@@ -208,30 +213,28 @@ export const useSocketStore = defineStore('socket', () => {
     }
 
     // Action pour ajouter un message de debug
-    const addDebugMessage = (content) => {
-        try {
-            // Utiliser formatMessage pour formatter le message de debug comme côté Node.js
-            const formattedMessage = formatMessage(content)
+    const addDebugMessage = async (content) => {
 
-            // Ajouter des métadonnées pour indiquer que c'est un message de debug
-            formattedMessage.source = 'manual-debug'
-            formattedMessage.content = formattedMessage.msg // Garder le contenu original
+        // Transfert du message au backend via IPC
+        if (window.electronAPI?.socket?.sendMessageToBackend) {
+            try {
+                const result = await window.electronAPI.socket.sendMessageToBackend(content);
 
-            return addMessage(formattedMessage)
-        } catch (error) {
-            console.error('Erreur lors du formatage du message de debug:', error)
+                console.log('Message envoyé au backend via IPC:', result);
 
-            // Fallback en cas d'erreur de formatage
-            const fallbackMessage = {
-                type: 'debug-message',
-                label: 'DEBUG',
-                content: content,
-                msg: content,
-                source: 'manual-debug',
-                timestamp: new Date().toISOString()
+                // Ajouter les messages formatés retournés par le backend au store
+                if (Array.isArray(result)) {
+                    result.forEach((formattedMessage) => addMessage(formattedMessage));
+                }
+
+                return result;
+            } catch (error) {
+                console.error('Erreur lors de l\'envoi du message au backend via IPC:', error);
             }
-            return addMessage(fallbackMessage)
+        } else {
+            console.warn('API Electron pour envoyer des messages au backend non disponible');
         }
+
     }
 
     // Statistiques
