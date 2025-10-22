@@ -17,6 +17,8 @@
           density="compact"
           hide-details
           class="debug-input"
+          @focus="openHelpModal"
+          @keyup.escape="helpModal = false"
           @keyup.enter="addDebugMessage"
           prepend-inner-icon="mdi-bug"
         >
@@ -46,6 +48,10 @@
         <v-icon>mdi-lan-connect</v-icon>
       </v-btn>
 
+      <v-btn icon @click="openHelpModal" class="mr-2">
+        <v-icon>mdi-help-circle</v-icon>
+      </v-btn>
+
       <!-- Toggle debug mode -->
       <v-btn icon @click="socketStore.toggleDebugMode" class="mr-2">
         <v-icon :color="socketStore.debugMode ? 'warning' : 'default'">
@@ -53,12 +59,17 @@
         </v-icon>
       </v-btn>
 
-      <v-btn icon @click="toggleCompactMode" class="mr-2 compact-mode-btn" v-tooltip="'Mode compact'">
+      <v-btn
+        icon
+        @click="toggleCompactMode"
+        class="mr-2 compact-mode-btn"
+        v-tooltip="'Mode compact'"
+      >
         <v-icon>{{
           themeStore.isCompact ? "mdi-fullscreen-exit" : "mdi-fullscreen"
         }}</v-icon>
       </v-btn>
-      
+
       <v-btn icon @click="toggleTheme">
         <v-icon>{{
           isDark ? "mdi-white-balance-sunny" : "mdi-weather-night"
@@ -71,6 +82,9 @@
         <DynamicTable />
       </v-container>
     </v-main>
+
+    <!-- Composant DebugHelp -->
+    <DebugHelp :visible="helpModal" @close="helpModal = false" />
 
     <!-- Modal WelcomeCard -->
     <v-dialog v-model="welcomeModal" max-width="800px">
@@ -129,6 +143,7 @@ import FeatureCard from "./components/FeatureCard.vue";
 import SocketManager from "./components/SocketManager.vue";
 import StoreViewer from "./components/StoreViewer.vue";
 import DynamicTable from "./components/DynamicTable.vue";
+import DebugHelp from "./components/DebugHelp.vue";
 
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === "dark");
@@ -141,9 +156,11 @@ const themeStore = useThemeStore();
 const welcomeModal = ref(false);
 const storeModal = ref(false);
 const socketModal = ref(false);
+const helpModal = ref(false);
 
 // Debug
 const debugMessage = ref("");
+const showDebugHelp = ref(false);
 
 const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
@@ -172,11 +189,21 @@ const openSocketModal = () => {
   socketModal.value = true;
 };
 
+const openHelpModal = () => {
+  helpModal.value = true;
+};
+
 // Fonction pour ajouter un message de debug
 const addDebugMessage = () => {
   if (debugMessage.value.trim()) {
     socketStore.addDebugMessage(debugMessage.value.trim());
     debugMessage.value = "";
+  }
+};
+
+const hideDebugHelp = () => {
+  if (!debugMessage.value.trim()) {
+    showDebugHelp.value = false;
   }
 };
 </script>
@@ -265,7 +292,7 @@ const addDebugMessage = () => {
 }
 
 .compact-mode-btn::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
