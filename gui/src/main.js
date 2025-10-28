@@ -18,19 +18,19 @@ const vuetify = createVuetify({
     directives,
     defaults: {
         // Paramètres par défaut pour les composants Vuetify (en mode normal)
-        VBtn: { }, // Pas de density ou size par défaut
+        VBtn: {}, // Pas de density ou size par défaut
         VTextField: { variant: 'outlined', hideDetails: true },
-        VCard: { },
-        VList: { },
+        VCard: {},
+        VList: {},
         VSelect: { hideDetails: true },
-        VMenu: { },
-        VChip: { },
-        VTable: { },
+        VMenu: {},
+        VChip: {},
+        VTable: {},
         VDialog: { maxWidth: '800px' },
-        VAlert: { },
-        VPagination: { },
-        VDataTable: { },
-        VTabs: { },
+        VAlert: {},
+        VPagination: {},
+        VDataTable: {},
+        VTabs: {},
     },
     theme: {
         defaultTheme: 'light',

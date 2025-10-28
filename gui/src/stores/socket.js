@@ -97,7 +97,7 @@ export const useSocketStore = defineStore('socket', () => {
         console.log('Ajout d\'un message au store:', message)
 
         // Ajouter en début de liste (messages les plus récents en premier)
-        messages.value.unshift(message)
+        messages.value.push(message)
 
         // Limiter le nombre de messages stockés (par exemple 1000)
         if (messages.value.length > 1000) {

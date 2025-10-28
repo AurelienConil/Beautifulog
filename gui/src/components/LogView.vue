@@ -98,90 +98,83 @@
         Aucun message pour {{ label }}
       </div>
 
-      <div v-else class="messages-list" ref="messagesList">
-        <v-virtual-scroll
-          :items="filteredMessages"
-          item-height="50"
-          class="pa-0"
-          ref="virtualScroll"
-          v-slot="{ item: message }"
+      <div v-else class="scroll-list" ref="scrollContainer">
+        <v-list-item
+          v-for="message in filteredMessages"
+          :key="message.id"
+          class="message-item"
+          :class="getMessageClass(message)"
         >
-          <v-list-item
-            :key="message.id"
-            class="message-item"
-            :class="getMessageClass(message)"
-          >
-            <template v-slot:prepend>
-              <v-icon :color="getMessageIconColor(message)" size="small">
-                {{ getMessageIcon(message) }}
-              </v-icon>
-            </template>
+          <template v-slot:prepend>
+            <v-icon :color="getMessageIconColor(message)" size="small">
+              {{ getMessageIcon(message) }}
+            </v-icon>
+          </template>
 
-            <template v-slot:append>
-              <v-tooltip location="right">
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    icon="mdi-information-outline"
-                    size="x-small"
-                    variant="text"
-                    color="grey"
-                    density="compact"
-                    v-bind="props"
-                  ></v-btn>
+          <template v-slot:append>
+            <v-tooltip location="right">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-information-outline"
+                  size="x-small"
+                  variant="text"
+                  color="grey"
+                  density="compact"
+                  v-bind="props"
+                ></v-btn>
+              </template>
+              <div>
+                <strong>Timestamp:</strong>
+                {{ formatTimestamp(message.timestamp) }}<br />
+                <strong>Socket ID:</strong>
+                {{ message.socketId ? message.socketId : "N/A" }}
+              </div>
+            </v-tooltip>
+          </template>
+
+          <v-list-item-content>
+            <v-list-item-title class="message-content">
+              <div class="message-data">
+                <pre v-if="isJsonData(message.msg)" class="json-data">{{
+                  formatJson(message.msg)
+                }}</pre>
+                <template v-else-if="message.format === 'json'">
+                  <div class="json-message">
+                    <JsonViewer :data="message.jsonData" />
+                  </div>
                 </template>
-                <div>
-                  <strong>Timestamp:</strong>
-                  {{ formatTimestamp(message.timestamp) }}<br />
-                  <strong>Socket ID:</strong>
-                  {{ message.socketId ? message.socketId : "N/A" }}
-                </div>
-              </v-tooltip>
-            </template>
-
-            <v-list-item-content>
-              <v-list-item-title class="message-content">
-                <div class="message-data">
-                  <pre v-if="isJsonData(message.msg)" class="json-data">{{
-                    formatJson(message.msg)
-                  }}</pre>
-                  <template v-else-if="message.format === 'json'">
-                    <div class="json-message">
-                      <JsonViewer :data="message.jsonData" />
-                    </div>
-                  </template>
-                  <template v-else-if="message.format === 'variable'">
-                    <div class="variable-message">
-                      <span>{{ message.msg }}</span>
-                      <div class="mt-1 variables-container">
-                        <template
-                          v-for="(value, varName) in message.variables"
-                          :key="varName"
+                <template v-else-if="message.format === 'variable'">
+                  <div class="variable-message">
+                    <span>{{ message.msg }}</span>
+                    <div class="mt-1 variables-container">
+                      <template
+                        v-for="(value, varName) in message.variables"
+                        :key="varName"
+                      >
+                        <span
+                          v-if="!isPinned(varName)"
+                          class="variable-link"
+                          @click="
+                            pinVariable(varName, value, message.timestamp)
+                          "
                         >
-                          <span
-                            v-if="!isPinned(varName)"
-                            class="variable-link"
-                            @click="
-                              pinVariable(varName, value, message.timestamp)
-                            "
+                          <v-chip
+                            size="x-small"
+                            color="purple-lighten-4"
+                            class="mr-1"
                           >
-                            <v-chip
-                              size="x-small"
-                              color="purple-lighten-4"
-                              class="mr-1"
-                            >
-                              {{ varName }}: {{ value }}
-                            </v-chip>
-                          </span>
-                        </template>
-                      </div>
+                            {{ varName }}: {{ value }}
+                          </v-chip>
+                        </span>
+                      </template>
                     </div>
-                  </template>
-                  <span v-else>{{ message.msg }}</span>
-                </div>
-              </v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
-        </v-virtual-scroll>
+                  </div>
+                </template>
+                <span v-else>{{ message.msg }}</span>
+              </div>
+            </v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
       </div>
     </v-card-text>
   </v-card>
@@ -212,8 +205,7 @@ const socketStore = useSocketStore();
 
 // Référence au conteneur des messages pour le défilement automatique
 const messagesContainer = ref(null);
-const messagesList = ref(null);
-const virtualScroll = ref(null);
+const scrollContainer = ref(null);
 
 // État pour le défilement automatique (toujours activé)
 const autoScroll = true; // Changé de ref(true) à une constante fixe
@@ -315,77 +307,97 @@ const getCardTextStyle = () => {
 };
 
 // Messages filtrés par label, type et contenu
+// const filteredMessages = computed(() => {
+//   console.log("Recalcul de filteredMessages");
+//   // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
+//   return socketStore.messages
+//     .filter((message) => message.label === props.label)
+//     .filter((message) => {
+//       // Filtrer par type de message
+//       return selectedTypes.value.includes(message.type || "log-message");
+//     })
+//     .filter((message) => {
+//       // Si ce n'est pas un message de type variable, l'afficher normalement
+//       if (message.format !== "variable") {
+//         return true;
+//       }
+
+//       // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
+//       const allVarsArePinned = Object.keys(message.variables).every((varName) =>
+//         isPinned(varName)
+//       );
+
+//       // Si toutes les variables sont épinglées, ne pas afficher le message
+//       return !allVarsArePinned;
+//     })
+//     .filter((message) => {
+//       // Si pas de filtre de contenu, afficher tous les messages
+//       if (!contentFilter.value) return true;
+
+//       // Recherche dans le contenu du message
+//       const filter = contentFilter.value.toLowerCase();
+
+//       // Pour les messages de format variable, vérifier dans le message et les variables
+//       if (message.format === "variable") {
+//         // Vérifier dans le message
+//         if (
+//           typeof message.msg === "string" &&
+//           message.msg.toLowerCase().includes(filter)
+//         ) {
+//           return true;
+//         }
+
+//         // Vérifier dans les variables
+//         if (message.variables) {
+//           for (const [varName, value] of Object.entries(message.variables)) {
+//             if (
+//               varName.toLowerCase().includes(filter) ||
+//               String(value).toLowerCase().includes(filter)
+//             ) {
+//               return true;
+//             }
+//           }
+//         }
+//         return false;
+//       }
+
+//       // Pour les messages JSON
+//       if (message.format === "json" || isJsonData(message.msg)) {
+//         const jsonString = JSON.stringify(
+//           message.jsonData || message.msg
+//         ).toLowerCase();
+//         return jsonString.includes(filter);
+//       }
+
+//       // Pour les messages texte standards
+//       return (
+//         typeof message.msg === "string" &&
+//         message.msg.toLowerCase().includes(filter)
+//       );
+//     })
+//     .slice() // Créer une copie pour ne pas modifier le tableau original
+//     .reverse(); // Inverser pour que les messages les plus récents soient en bas
+// });
+
 const filteredMessages = computed(() => {
-  console.log("Recalcul de filteredMessages");
-  // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
-  return socketStore.messages
-    .filter((message) => message.label === props.label)
-    .filter((message) => {
-      // Filtrer par type de message
-      return selectedTypes.value.includes(message.type || "log-message");
-    })
-    .filter((message) => {
-      // Si ce n'est pas un message de type variable, l'afficher normalement
-      if (message.format !== "variable") {
-        return true;
-      }
-
-      // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
-      const allVarsArePinned = Object.keys(message.variables).every((varName) =>
-        isPinned(varName)
-      );
-
-      // Si toutes les variables sont épinglées, ne pas afficher le message
-      return !allVarsArePinned;
-    })
-    .filter((message) => {
-      // Si pas de filtre de contenu, afficher tous les messages
-      if (!contentFilter.value) return true;
-
-      // Recherche dans le contenu du message
-      const filter = contentFilter.value.toLowerCase();
-
-      // Pour les messages de format variable, vérifier dans le message et les variables
-      if (message.format === "variable") {
-        // Vérifier dans le message
-        if (
-          typeof message.msg === "string" &&
-          message.msg.toLowerCase().includes(filter)
-        ) {
-          return true;
-        }
-
-        // Vérifier dans les variables
-        if (message.variables) {
-          for (const [varName, value] of Object.entries(message.variables)) {
-            if (
-              varName.toLowerCase().includes(filter) ||
-              String(value).toLowerCase().includes(filter)
-            ) {
-              return true;
-            }
-          }
-        }
-        return false;
-      }
-
-      // Pour les messages JSON
-      if (message.format === "json" || isJsonData(message.msg)) {
-        const jsonString = JSON.stringify(
-          message.jsonData || message.msg
-        ).toLowerCase();
-        return jsonString.includes(filter);
-      }
-
-      // Pour les messages texte standards
-      return (
-        typeof message.msg === "string" &&
-        message.msg.toLowerCase().includes(filter)
-      );
-    })
-    .slice() // Créer une copie pour ne pas modifier le tableau original
-    .reverse(); // Inverser pour que les messages les plus récents soient en bas
+  return socketStore.messages.filter(
+    (message) => message.label === props.label
+  );
 });
+
+const filteredMessagesCount = computed(() => {
+  return filteredMessages.value.length;
+});
+
+watch(
+  () => filteredMessagesCount.value,
+  async () => {
+    await nextTick();
+    if (scrollContainer.value) {
+      scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+    }
+  }
+);
 
 // Variable pour mémoriser le dernier timestamp
 const lastMessageTimestamp = ref(0);
@@ -426,47 +438,6 @@ const updateAllPinnedVariables = () => {
 watch(filteredMessages, () => {
   updateAllPinnedVariables();
 });
-
-// Fonction de défilement vers le bas (toujours active)
-const scrollToBottom = (force = false) => {
-  console.log("scrollToBottom called");
-
-  if (virtualScroll.value) {
-    const performScroll = () => {
-      virtualScroll.value.scrollToIndex(filteredMessages.value.length - 1);
-    };
-
-    // Exécution immédiate, toujours
-    performScroll();
-  } else if (messagesContainer.value) {
-    const performScroll = () => {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    };
-
-    // Toujours exécuter le défilement
-    performScroll();
-    nextTick(performScroll);
-    setTimeout(performScroll, 100);
-  }
-};
-
-watchEffect(() => {
-  console.log("filteredMessages Watch Effect :", filteredMessages.value);
-  //scroll to bottom in 200ms
-  setTimeout(() => {
-    scrollToBottom(true);
-  }, 200);
-});
-
-// Observer filteredMessages.length pour détecter les changements
-watch(
-  () => filteredMessages.length,
-  (newLength, oldLength) => {
-    console.log(
-      `filteredMessages.length a changé : ancien = ${oldLength}, nouveau = ${newLength}`
-    );
-  }
-);
 
 // Couleur du statut basée sur les types de messages
 const getStatusColor = () => {
@@ -568,17 +539,6 @@ const isJsonData = (msg) => {
 const formatJson = (msg) => {
   return JSON.stringify(msg, null, 2);
 };
-
-// Défiler vers le bas au chargement initial
-onMounted(() => {
-  nextTick(() => {
-    // Défiler vers le bas après le rendu initial
-    scrollToBottom(true);
-
-    // Essayer à nouveau après un délai pour s'assurer que tout est chargé
-    setTimeout(() => scrollToBottom(true), 200);
-  });
-});
 </script>
 
 <style scoped>
@@ -588,6 +548,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.scroll-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 8px;
 }
 
 .message-item {
