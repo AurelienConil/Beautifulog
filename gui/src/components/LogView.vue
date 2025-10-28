@@ -98,57 +98,54 @@
         Aucun message pour {{ label }}
       </div>
 
-      <div v-else class="scroll-list" ref="scrollContainer">
-        <v-list-item
-          v-for="message in filteredMessages"
-          :key="message.id"
-          class="message-item"
-          :class="getMessageClass(message)"
-        >
-          <v-list-item-content>
-            <v-list-item-title class="message-content">
-              <div class="message-data">
-                <pre v-if="isJsonData(message.msg)" class="json-data">{{
-                  formatJson(message.msg)
-                }}</pre>
-                <template v-else-if="message.format === 'json'">
-                  <div class="json-message">
-                    <JsonViewer :data="message.jsonData" />
-                  </div>
-                </template>
-                <template v-else-if="message.format === 'variable'">
-                  <div class="variable-message">
-                    <span>{{ message.msg }}</span>
-                    <div class="mt-1 variables-container">
-                      <template
-                        v-for="(value, varName) in message.variables"
-                        :key="varName"
-                      >
-                        <span
-                          v-if="!isPinned(varName)"
-                          class="variable-link"
-                          @click="
-                            pinVariable(varName, value, message.timestamp)
-                          "
-                        >
-                          <v-chip
-                            size="x-small"
-                            color="purple-lighten-4"
-                            class="mr-1"
-                          >
-                            {{ varName }}: {{ value }}
-                          </v-chip>
-                        </span>
-                      </template>
-                    </div>
-                  </div>
-                </template>
-                <span v-else>{{ message.msg }}</span>
+      <v-virtual-scroll
+        v-else
+        :items="filteredMessages"
+        item-height="100"
+        ref="scrollContainer"
+      >
+        <template v-slot:default="{ item: message }">
+          <v-list-item
+            class="message-content"
+            :title="message.msg"
+            :class="getMessageClass(message)"
+          >
+            <template v-slot:prepend v-if="isJsonData(message.msg)">{{
+              formatJson(message.msg)
+            }}</template>
+            <template v-slot:prepend v-else-if="message.format === 'json'">
+              <div class="json-message">
+                <JsonViewer :data="message.jsonData" />
               </div>
-            </v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-      </div>
+            </template>
+            <template v-slot:prepend v-else-if="message.format === 'variable'">
+              <div class="variable-message">
+                <span>{{ message.msg }}</span>
+                <div class="mt-1 variables-container">
+                  <template
+                    v-for="(value, varName) in message.variables"
+                    :key="varName"
+                  >
+                    <span
+                      v-if="!isPinned(varName)"
+                      class="variable-link"
+                      @click="pinVariable(varName, value, message.timestamp)"
+                    >
+                      <v-chip
+                        size="x-small"
+                        color="purple-lighten-4"
+                        class="mr-1"
+                      >
+                        {{ varName }}: {{ value }}
+                      </v-chip>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </v-list-item>
+        </template>
+      </v-virtual-scroll>
     </v-card-text>
   </v-card>
 </template>
@@ -279,84 +276,82 @@ const getCardTextStyle = () => {
   }
 };
 
-// Messages filtrés par label, type et contenu
-// const filteredMessages = computed(() => {
-//   console.log("Recalcul de filteredMessages");
-//   // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
-//   return socketStore.messages
-//     .filter((message) => message.label === props.label)
-//     .filter((message) => {
-//       // Filtrer par type de message
-//       return selectedTypes.value.includes(message.type || "log-message");
-//     })
-//     .filter((message) => {
-//       // Si ce n'est pas un message de type variable, l'afficher normalement
-//       if (message.format !== "variable") {
-//         return true;
-//       }
-
-//       // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
-//       const allVarsArePinned = Object.keys(message.variables).every((varName) =>
-//         isPinned(varName)
-//       );
-
-//       // Si toutes les variables sont épinglées, ne pas afficher le message
-//       return !allVarsArePinned;
-//     })
-//     .filter((message) => {
-//       // Si pas de filtre de contenu, afficher tous les messages
-//       if (!contentFilter.value) return true;
-
-//       // Recherche dans le contenu du message
-//       const filter = contentFilter.value.toLowerCase();
-
-//       // Pour les messages de format variable, vérifier dans le message et les variables
-//       if (message.format === "variable") {
-//         // Vérifier dans le message
-//         if (
-//           typeof message.msg === "string" &&
-//           message.msg.toLowerCase().includes(filter)
-//         ) {
-//           return true;
-//         }
-
-//         // Vérifier dans les variables
-//         if (message.variables) {
-//           for (const [varName, value] of Object.entries(message.variables)) {
-//             if (
-//               varName.toLowerCase().includes(filter) ||
-//               String(value).toLowerCase().includes(filter)
-//             ) {
-//               return true;
-//             }
-//           }
-//         }
-//         return false;
-//       }
-
-//       // Pour les messages JSON
-//       if (message.format === "json" || isJsonData(message.msg)) {
-//         const jsonString = JSON.stringify(
-//           message.jsonData || message.msg
-//         ).toLowerCase();
-//         return jsonString.includes(filter);
-//       }
-
-//       // Pour les messages texte standards
-//       return (
-//         typeof message.msg === "string" &&
-//         message.msg.toLowerCase().includes(filter)
-//       );
-//     })
-//     .slice() // Créer une copie pour ne pas modifier le tableau original
-//     .reverse(); // Inverser pour que les messages les plus récents soient en bas
-// });
-
+//Messages filtrés par label, type et contenu
 const filteredMessages = computed(() => {
-  return socketStore.messages.filter(
-    (message) => message.label === props.label
-  );
+  console.log("Recalcul de filteredMessages");
+  // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
+  return socketStore.messages
+    .filter((message) => message.label === props.label)
+    .filter((message) => {
+      // Filtrer par type de message
+      return selectedTypes.value.includes(message.type || "log-message");
+    })
+    .filter((message) => {
+      // Si ce n'est pas un message de type variable, l'afficher normalement
+      if (message.format !== "variable") {
+        return true;
+      }
+
+      // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
+      const allVarsArePinned = Object.keys(message.variables).every((varName) =>
+        isPinned(varName)
+      );
+
+      // Si toutes les variables sont épinglées, ne pas afficher le message
+      return !allVarsArePinned;
+    })
+    .filter((message) => {
+      // Si pas de filtre de contenu, afficher tous les messages
+      if (!contentFilter.value) return true;
+
+      // Recherche dans le contenu du message
+      const filter = contentFilter.value.toLowerCase();
+
+      // Pour les messages de format variable, vérifier dans le message et les variables
+      if (message.format === "variable") {
+        // Vérifier dans le message
+        if (
+          typeof message.msg === "string" &&
+          message.msg.toLowerCase().includes(filter)
+        ) {
+          return true;
+        }
+
+        // Vérifier dans les variables
+        if (message.variables) {
+          for (const [varName, value] of Object.entries(message.variables)) {
+            if (
+              varName.toLowerCase().includes(filter) ||
+              String(value).toLowerCase().includes(filter)
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // Pour les messages JSON
+      if (message.format === "json" || isJsonData(message.msg)) {
+        const jsonString = JSON.stringify(
+          message.jsonData || message.msg
+        ).toLowerCase();
+        return jsonString.includes(filter);
+      }
+
+      // Pour les messages texte standards
+      return (
+        typeof message.msg === "string" &&
+        message.msg.toLowerCase().includes(filter)
+      );
+    });
 });
+
+// const filteredMessages = computed(() => {
+//   return socketStore.messages.filter(
+//     (message) => message.label === props.label
+//   );
+// });
 
 const filteredMessagesCount = computed(() => {
   return filteredMessages.value.length;
@@ -366,8 +361,15 @@ watch(
   () => filteredMessagesCount.value,
   async () => {
     await nextTick();
-    if (scrollContainer.value) {
-      scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+    // Pour v-virtual-scroll, utiliser la méthode scrollToIndex si disponible
+    if (scrollContainer.value && filteredMessages.value.length > 0) {
+      // On scroll sur le dernier index (le plus récent)
+      if (typeof scrollContainer.value.scrollToIndex === "function") {
+        scrollContainer.value.scrollToIndex(filteredMessages.value.length - 1);
+      } else {
+        // fallback pour compatibilité
+        scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+      }
     }
   }
 );
@@ -582,6 +584,7 @@ const formatJson = (msg) => {
 
 .message-content {
   font-size: 0.875rem !important;
+  height: 100px;
 }
 
 .variable-message {

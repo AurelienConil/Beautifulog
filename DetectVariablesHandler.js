@@ -40,10 +40,6 @@ class DetectVariablesHandler extends ChainHandler {
         for (const segmentObj of segmentObjects) {
             // Détection du format "nom = valeur"
             let match = segmentObj.segment.match(/^([a-zA-Z0-9_]+)\s*=\s*([^=]+)$/);
-            if (!match) {
-                // Détection du format "nom : valeur"
-                match = segmentObj.segment.match(/^([a-zA-Z0-9_]+)\s*:\s*([^:]+)$/);
-            }
 
             if (match) {
                 const name = match[1].trim();
