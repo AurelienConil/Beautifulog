@@ -38,30 +38,22 @@ class DetectVariablesHandler extends ChainHandler {
         }));
 
         for (const segmentObj of segmentObjects) {
-            // Détection du format "nom = valeur"
-            let match = segmentObj.segment.match(/^([a-zA-Z0-9_]+)\s*=\s*([^=]+)$/);
+            // Détection du format "nom = valeur [unité]" avec décimal et %, unité collée ou séparée
+            let match = segmentObj.segment.match(/^([a-zA-Z0-9_ ]+)\s*=\s*(-?\d+(?:\.\d+)?)(?:\s*%|%|\s*([a-zA-Z]+))?$/);
 
             if (match) {
                 const name = match[1].trim();
                 const value = match[2].trim();
-
-                // Vérifier si la valeur est valide selon nos nouvelles règles
-                const isValidVariable = (
-                    // Règle 1: Un nombre seul
-                    /^\d+(\.\d+)?$/.test(value) ||
-
-                    // Règle 2: Un nombre suivi d'un seul mot (unité)
-                    /^\d+(\.\d+)?\s+\w+$/.test(value) ||
-
-                    // Règle 3: Une chaîne sans espace (un seul "mot")
-                    /^"[^"]*"$/.test(value) || /^'[^']*'$/.test(value) || /^[^\s]+$/.test(value)
-                );
-
-                if (isValidVariable) {
-                    segmentObj.hasVariables = true;
-                    segmentObj.variables.name = name;
-                    segmentObj.variables.value = value;
+                let unit = null;
+                if (match[0].includes('%')) {
+                    unit = '%';
+                } else if (match[3]) {
+                    unit = match[3].trim();
                 }
+
+                segmentObj.hasVariables = true;
+                segmentObj.variables.name = name;
+                segmentObj.variables.value = unit ? value + ' ' + unit : value;
             }
         }
 

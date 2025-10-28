@@ -367,9 +367,18 @@ const filteredMessagesCount = computed(() => {
 });
 
 watch(
+  () => filteredMessages.value,
+  () => {
+    // Mettre à jour les variables épinglées avec les dernières valeurs
+    updateAllPinnedVariables();
+  }
+);
+
+watch(
   () => filteredMessagesCount.value,
   async () => {
     await nextTick();
+
     // Pour v-virtual-scroll, utiliser la méthode scrollToIndex si disponible
     if (scrollContainer.value && filteredMessagesCount.value > 0) {
       // On scroll sur le dernier index (le plus récent)
@@ -377,7 +386,7 @@ watch(
       setTimeout(() => {
         scrollContainer.value.scrollToIndex(filteredMessagesCount.value);
         console.log("scoll done");
-      }, 10);
+      }, 20);
 
       //scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
     }
@@ -402,12 +411,18 @@ const updateAllPinnedVariables = () => {
     .forEach((message) => {
       if (message.variables) {
         Object.entries(message.variables).forEach(([varName, value]) => {
-          // Si la variable est épinglée et qu'on n'a pas encore sa dernière valeur
-          if (isPinned(varName) && !latestValues[varName]) {
-            latestValues[varName] = {
-              value,
-              timestamp: message.timestamp,
-            };
+          // Si la variable est épinglée, on prend toujours la valeur la plus récente
+          if (isPinned(varName)) {
+            // Si latestValues[varName] n'existe pas ou si ce message est plus récent
+            if (
+              !latestValues[varName] ||
+              message.timestamp > latestValues[varName].timestamp
+            ) {
+              latestValues[varName] = {
+                value,
+                timestamp: message.timestamp,
+              };
+            }
           }
         });
       }
@@ -420,9 +435,6 @@ const updateAllPinnedVariables = () => {
 };
 
 // Appeler la fonction de mise à jour après chaque recalcul des messages filtrés
-watch(filteredMessages, () => {
-  updateAllPinnedVariables();
-});
 
 // Couleur du statut basée sur les types de messages
 const getStatusColor = () => {
