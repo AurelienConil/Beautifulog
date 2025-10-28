@@ -105,33 +105,6 @@
           class="message-item"
           :class="getMessageClass(message)"
         >
-          <template v-slot:prepend>
-            <v-icon :color="getMessageIconColor(message)" size="small">
-              {{ getMessageIcon(message) }}
-            </v-icon>
-          </template>
-
-          <template v-slot:append>
-            <v-tooltip location="right">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  icon="mdi-information-outline"
-                  size="x-small"
-                  variant="text"
-                  color="grey"
-                  density="compact"
-                  v-bind="props"
-                ></v-btn>
-              </template>
-              <div>
-                <strong>Timestamp:</strong>
-                {{ formatTimestamp(message.timestamp) }}<br />
-                <strong>Socket ID:</strong>
-                {{ message.socketId ? message.socketId : "N/A" }}
-              </div>
-            </v-tooltip>
-          </template>
-
           <v-list-item-content>
             <v-list-item-title class="message-content">
               <div class="message-data">

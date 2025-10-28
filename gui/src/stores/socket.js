@@ -94,7 +94,7 @@ export const useSocketStore = defineStore('socket', () => {
             ...messageData
         }
 
-        console.log('Ajout d\'un message au store:', message)
+        //console.log('Ajout d\'un message au store:', message)
 
         // Ajouter en début de liste (messages les plus récents en premier)
         messages.value.push(message)
@@ -180,13 +180,13 @@ export const useSocketStore = defineStore('socket', () => {
 
             // Écouter les messages reçus via Socket.IO
             window.electronAPI.socket.onMessageReceived((data) => {
-                console.log('Message reçu depuis IPC dans le store:', data)
+                //console.log('Message reçu depuis IPC dans le store:', data)
                 addMessage(data)
             })
 
             // Écouter les déconnexions de clients
             window.electronAPI.socket.onClientDisconnected((data) => {
-                console.log('Client déconnecté depuis IPC dans le store:', data)
+                //console.log('Client déconnecté depuis IPC dans le store:', data)
                 addConnectionEvent({
                     type: 'disconnect',
                     socketId: data.socketId,
