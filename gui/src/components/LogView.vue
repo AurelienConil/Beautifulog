@@ -1,5 +1,6 @@
+
 <template>
-  <v-card class="log-view" height="100%">
+  <v-card class="log-view">
     <v-card-title class="d-flex justify-space-between align-center">
       <v-expansion-panels>
         <v-expansion-panel>
@@ -89,11 +90,7 @@
       </div>
     </v-card-subtitle>
 
-    <v-card-text
-      class="pa-2 message-container"
-      :style="getCardTextStyle()"
-      ref="messagesContainer"
-    >
+    <v-card-text class="pa-2 log-content-area" ref="messagesContainer">
       <div v-if="filteredMessages.length === 0" class="text-center text-grey">
         Aucun message pour {{ label }}
       </div>
@@ -101,49 +98,62 @@
       <v-virtual-scroll
         v-else
         :items="filteredMessages"
-        item-height="100"
+        item-height="50"
         ref="scrollContainer"
       >
         <template v-slot:default="{ item: message }">
-          <v-list-item
-            class="message-content"
-            :title="message.msg"
+          <div
+            class="message-item message-content"
             :class="getMessageClass(message)"
+            :title="message.msg"
+            style="padding: 8px; border-radius: 4px; margin-bottom: 2px"
           >
-            <template v-slot:prepend v-if="isJsonData(message.msg)">{{
-              formatJson(message.msg)
-            }}</template>
-            <template v-slot:prepend v-else-if="message.format === 'json'">
-              <div class="json-message">
-                <JsonViewer :data="message.jsonData" />
-              </div>
-            </template>
-            <template v-slot:prepend v-else-if="message.format === 'variable'">
-              <div class="variable-message">
-                <span>{{ message.msg }}</span>
-                <div class="mt-1 variables-container">
-                  <template
-                    v-for="(value, varName) in message.variables"
-                    :key="varName"
-                  >
-                    <span
-                      v-if="!isPinned(varName)"
-                      class="variable-link"
-                      @click="pinVariable(varName, value, message.timestamp)"
+            <div class="message-header">
+              <span class="timestamp">{{
+                formatTimestamp(message.timestamp)
+              }}</span>
+              <span
+                v-if="message.type"
+                class="type-label"
+                :class="message.type.replace('-message', '')"
+              >
+                {{ message.type.replace("-message", "") }}
+              </span>
+            </div>
+            <div class="message-data">
+              <pre v-if="isJsonData(message.msg)" class="json-data">{{
+                formatJson(message.msg)
+              }}</pre>
+              <template v-else-if="message.format === 'json'">
+                <div class="json-message">
+                  <JsonViewer :data="message.jsonData" />
+                </div>
+              </template>
+              <template v-else-if="message.format === 'variable'">
+                <div class="variable-message">
+                  <span>{{ message.msg }}</span>
+                  <div class="variables-container">
+                    <template
+                      v-for="(value, varName) in message.variables"
+                      :key="varName"
                     >
-                      <v-chip
-                        size="x-small"
-                        color="purple-lighten-4"
-                        class="mr-1"
+                      <span
+                        v-if="!isPinned(varName)"
+                        class="variable-link variable-badge"
+                        @click="pinVariable(varName, value, message.timestamp)"
                       >
                         {{ varName }}: {{ value }}
-                      </v-chip>
-                    </span>
-                  </template>
+                      </span>
+                      <span v-else class="variable-badge variable-badge-pinned">
+                        {{ varName }}
+                      </span>
+                    </template>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </v-list-item>
+              </template>
+              <span v-else>{{ message.msg }}</span>
+            </div>
+          </div>
         </template>
       </v-virtual-scroll>
     </v-card-text>
@@ -278,7 +288,6 @@ const getCardTextStyle = () => {
 
 //Messages filtrés par label, type et contenu
 const filteredMessages = computed(() => {
-  console.log("Recalcul de filteredMessages");
   // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
   return socketStore.messages
     .filter((message) => message.label === props.label)
@@ -362,14 +371,15 @@ watch(
   async () => {
     await nextTick();
     // Pour v-virtual-scroll, utiliser la méthode scrollToIndex si disponible
-    if (scrollContainer.value && filteredMessages.value.length > 0) {
+    if (scrollContainer.value && filteredMessagesCount.value > 0) {
       // On scroll sur le dernier index (le plus récent)
-      if (typeof scrollContainer.value.scrollToIndex === "function") {
-        scrollContainer.value.scrollToIndex(filteredMessages.value.length - 1);
-      } else {
-        // fallback pour compatibilité
-        scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
-      }
+      //wait for 10ms
+      setTimeout(() => {
+        scrollContainer.value.scrollToIndex(filteredMessagesCount.value);
+        console.log("scoll done");
+      }, 10);
+
+      //scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
     }
   }
 );
@@ -517,19 +527,20 @@ const formatJson = (msg) => {
 </script>
 
 <style scoped>
+.log-content-area {
+  height: 435px;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .log-view {
   border: 1px solid rgba(0, 0, 0, 0.12);
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.scroll-list {
-  max-height: 300px;
-  overflow-y: auto;
-  border: 1px solid #ccc;
-  padding: 8px;
 }
 
 .message-item {
@@ -584,7 +595,15 @@ const formatJson = (msg) => {
 
 .message-content {
   font-size: 0.875rem !important;
-  height: 100px;
+  font-family: monospace;
+  color: black;
+  height: 50px !important;
+  min-height: 50px !important;
+  max-height: 50px !important;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .variable-message {
@@ -593,16 +612,26 @@ const formatJson = (msg) => {
 
 .variable-link {
   cursor: pointer;
+}
+.variable-badge {
+  background: #ede7f6;
+  color: #6a1b9a;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-right: 4px;
+  font-size: 0.8em;
   display: inline-block;
   transition: transform 0.2s;
 }
-
 .variable-link:hover {
   transform: translateY(-2px);
 }
-
 .variable-link:active {
   transform: translateY(0);
+}
+.variable-badge-pinned {
+  background: #d1c4e9;
+  color: #4a148c;
 }
 
 .pinned-vars-panel {
@@ -628,20 +657,6 @@ const formatJson = (msg) => {
   gap: 4px;
 }
 
-.message-container {
-  position: relative;
-  scroll-behavior: smooth;
-  display: flex;
-  flex-direction: column;
-  overflow-anchor: auto; /* Aide à maintenir la position de défilement lors de l'ajout de contenu */
-}
-
-.messages-list {
-  display: flex;
-  flex-direction: column; /* Ordre normal - anciens en haut, nouveaux en bas */
-  min-height: 100%;
-}
-
 .content-filter {
   min-width: 100px;
   max-width: 200px;
@@ -653,7 +668,35 @@ const formatJson = (msg) => {
   justify-content: center;
 }
 
-.type-filters .v-chip {
-  margin: 0 4px;
+.type-label {
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-left: 8px;
+  font-weight: bold;
+  font-size: 0.8em;
+}
+.type-label.error {
+  background: rgba(244, 67, 54, 0.15);
+  color: #b71c1c;
+}
+.type-label.warning {
+  background: rgba(255, 152, 0, 0.15);
+  color: #ff9800;
+}
+.type-label.info {
+  background: rgba(33, 150, 243, 0.15);
+  color: #1976d2;
+}
+.type-label.log {
+  background: rgba(76, 175, 80, 0.15);
+  color: #388e3c;
+}
+.label-label {
+  background: #eee;
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-left: 8px;
+  font-size: 0.8em;
 }
 </style>
