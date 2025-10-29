@@ -2,31 +2,49 @@
   <v-container fluid class="dynamic-table pa-4" style="height: 100%">
     <v-row class="my-0 py-0">
       <v-col cols="12" class="py-0">
-      <v-card>
-        <v-card-title class="d-flex justify-space-between align-center">
-        <h3>Vue des Logs par Process</h3>
-        <div class="d-flex align-center">
-          <v-chip color="primary" size="small" class="mr-2">
-          {{ uniqueLabels.length }} process{{
-            uniqueLabels.length > 1 ? "us" : ""
-          }}
-          </v-chip>
-          <v-btn
-          icon="mdi-refresh"
-          size="small"
-          @click="refreshData"
-          variant="text"
-          />
-          <v-btn
-          icon="mdi-delete-sweep"
-          size="small"
-          @click="clearAllMessages"
-          variant="text"
-          color="error"
-          />
-        </div>
-        </v-card-title>
-      </v-card>
+        <v-card>
+          <v-card-title class="d-flex justify-space-between align-center">
+            <h3>Vue des Logs par Process</h3>
+            {{ socketStore.maxTimestampValue.toFixed(0) - socketStore.timeStampAtStop.toFixed(0) }} ms
+            <v-slider
+              v-if="!socketStore.IPCActivated"
+              v-model="socketStore.maxTimestampValue"
+              :min="socketStore.timeStampAtStop - 10000"
+              :max="socketStore.timeStampAtStop"
+            >
+            </v-slider>
+            <div class="d-flex align-center">
+              <v-chip color="primary" size="small" class="mr-2">
+                {{ uniqueLabels.length }} process{{
+                  uniqueLabels.length > 1 ? "us" : ""
+                }}
+              </v-chip>
+              <v-btn
+                icon="mdi-refresh"
+                size="small"
+                @click="refreshData"
+                variant="text"
+              />
+              <v-btn
+                icon="mdi-delete-sweep"
+                size="small"
+                @click="clearAllMessages"
+                variant="text"
+                color="error"
+              />
+              <v-btn
+                :icon="socketStore.IPCActivated ? 'mdi-pause' : 'mdi-play'"
+                size="small"
+                @click="
+                  socketStore.toggleIPCReception(!socketStore.IPCActivated)
+                "
+                :color="socketStore.IPCActivated ? 'warning' : 'success'"
+                variant="text"
+              />
+              {{ socketStore.IPCActivated ? "IPC Actif" : "IPC Inactif" }}
+            </div>
+          </v-card-title>
+        </v-card>
       </v-col>
     </v-row>
 
@@ -53,14 +71,11 @@
         class="column-container"
       >
         <div class="log-column">
-          <LogView 
-            :label="label" 
-            @hide="hideLabel"
-          />
+          <LogView :label="label" @hide="hideLabel" />
         </div>
       </v-col>
     </v-row>
-    
+
     <!-- Bannière pour afficher les labels masqués -->
     <v-row v-if="getHiddenLabelsInMessages.length > 0" class="mt-2">
       <v-col cols="12">
@@ -78,7 +93,9 @@
               size="small"
               class="ma-1"
               closable
-              @click:close="hiddenLabels = hiddenLabels.filter(l => l !== label)"
+              @click:close="
+                hiddenLabels = hiddenLabels.filter((l) => l !== label)
+              "
             >
               {{ label }}
             </v-chip>
@@ -151,10 +168,7 @@ watch(
     if (socketStore.messages.length > 0) {
       // Prendre le dernier message ajouté (le premier dans le tableau, car ils sont ajoutés en début de liste)
       const latestMessage = socketStore.messages[0];
-      if (
-        latestMessage &&
-        latestMessage.label
-      ) {
+      if (latestMessage && latestMessage.label) {
         // Si le label n'est pas encore dans l'ordre, l'ajouter
         if (!labelOrder.value.includes(latestMessage.label)) {
           // Ajouter le nouveau label à la fin de l'ordre (à droite)
@@ -187,7 +201,7 @@ const uniqueLabels = computed(() => {
   ];
 
   // Filtrer les labels masqués
-  return result.filter(label => !hiddenLabels.value.includes(label));
+  return result.filter((label) => !hiddenLabels.value.includes(label));
 });
 
 // Nombre d'erreurs total
@@ -232,14 +246,15 @@ const getHiddenLabelsInMessages = computed(() => {
       currentLabels.add(message.label);
     }
   });
-  
+
   // Retourner les labels qui sont à la fois dans les messages et dans hiddenLabels
-  return hiddenLabels.value.filter(label => currentLabels.has(label));
+  return hiddenLabels.value.filter((label) => currentLabels.has(label));
 });
 
 // Lifecycle
 onMounted(() => {
   console.log("DynamicTable monté");
+
   // Initialiser les écouteurs si ce n'est pas déjà fait
   socketStore.initializeSocketListeners();
 
@@ -254,6 +269,12 @@ onMounted(() => {
       }
     }
   });
+
+  console.log(
+    "DynamicTable Valeur initiale de IPCActivated:",
+    socketStore.IPCActivated
+  );
+  console.log("Store complet :", socketStore);
 });
 
 onUnmounted(() => {

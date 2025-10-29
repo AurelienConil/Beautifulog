@@ -353,6 +353,17 @@ const filteredMessages = computed(() => {
         typeof message.msg === "string" &&
         message.msg.toLowerCase().includes(filter)
       );
+    })
+    .filter((message) => {
+      // Filtrer les messages en fonction du timestamp si la réception IPC est désactivée
+      if (!socketStore.IPCActivated) {
+        // socketStore.maxTimestampValue est le timestamp maximum à afficher, et calculé en fonctione de Date.now()
+        // Le timestamp du message est calculé avec timestamp: new Date().toISOString()
+        // il faut donc convertir les deux en millisecondes pour la comparaison
+        const messageTime = new Date(message.timestamp).getTime();
+        return messageTime <= socketStore.maxTimestampValue;
+      }
+      return true;
     });
 });
 
@@ -561,6 +572,15 @@ const formatJson = (msg) => {
   font-family: "Lucida Console", monospace;
 }
 
+.message-content {
+  font-size: 0.875rem !important;
+  color: black;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .message-item.error-message {
   background-color: rgba(244, 67, 54, 0.05);
 }
@@ -605,18 +625,7 @@ const formatJson = (msg) => {
   overflow-y: auto;
 }
 
-.message-content {
-  font-size: 0.875rem !important;
-  font-family: monospace;
-  color: black;
-  height: 50px !important;
-  min-height: 50px !important;
-  max-height: 50px !important;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+
 
 .variable-message {
   padding: 4px 0;
@@ -656,9 +665,11 @@ const formatJson = (msg) => {
 }
 
 .json-message {
+  position:absolute;
+  z-index: 10;
   padding: 8px;
   border-radius: 4px;
-  background-color: rgba(33, 150, 243, 0.05);
+  background-color: rgb(225, 241, 255);
   margin: 4px 0;
   border-left: 3px solid rgba(33, 150, 243, 0.3);
 }

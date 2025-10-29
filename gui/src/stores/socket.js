@@ -10,10 +10,119 @@ export const useSocketStore = defineStore('socket', () => {
     })
 
     const messages = ref([])
+
+    //add some debug message for testing
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'variable',
+        variables:
+        {
+            toto: "4ms",
+
+        }
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'json',
+        jsonData: {
+            temperature: "22 °C",
+            humidity: "45 %",
+            pressure: "1013 hPa",
+            happinessIndex: 87
+        }
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'log-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'error-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'warning-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'info-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+
+
+
+
+
+
     const connectionHistory = ref([])
     const debugMode = ref(true) // Mode debug activé par défaut pour le développement
 
     let messageIdCounter = 0
+
+    // État pour contrôler la réception des messages
+    const isReceivingMessages = ref(true);
+
+    // État pour contrôler l'activation des commandes IPC
+    const IPCActivated = ref(true);
+
+    const timeStampAtStop = ref(0);
+
+    console.log("Valeur initiale de IPCActivated dans le store:", IPCActivated.value);
+
+    // Action pour activer/désactiver la réception des messages depuis le backend
+    const toggleIPCReception = (enable) => {
+        IPCActivated.value = enable;
+        if (!enable) {
+            maxTimestampValue.value = new Date().getTime();
+            timeStampAtStop.value = maxTimestampValue.value;
+        }
+        console.log("maxTimestampValue après toggleIPCReception:", maxTimestampValue.value);
+        console.log(`Réception des messages depuis le backend ${enable ? 'activée' : 'désactivée'}`);
+    };
+
+    // Nouvelle valeur partagée pour maxTimestampValue
+    const maxTimestampValue = ref(0);
+
+    // Getter pour accéder à maxTimestampValue
+    const getMaxTimestampValue = computed(() => maxTimestampValue.value);
+
+    // Setter pour mettre à jour maxTimestampValue
+    const setMaxTimestampValue = (value) => {
+        maxTimestampValue.value = value;
+        console.log('maxTimestampValue mis à jour:', value);
+    };
 
     // Getters (computed)
     const isServerRunning = computed(() => serverStatus.value.isRunning)
@@ -180,19 +289,24 @@ export const useSocketStore = defineStore('socket', () => {
 
             // Écouter les messages reçus via Socket.IO
             window.electronAPI.socket.onMessageReceived((data) => {
-                //console.log('Message reçu depuis IPC dans le store:', data)
-                addMessage(data)
-            })
+                if (IPCActivated.value) {
+                    addMessage(data);
+                    if (data.timestamp && data.timestamp > maxTimestampValue.value) {
+                        setMaxTimestampValue(data.timestamp);
+                    }
+                } else {
+                    console.log('Message ignoré car la réception depuis le backend est désactivée:', data);
+                }
+            });
 
             // Écouter les déconnexions de clients
             window.electronAPI.socket.onClientDisconnected((data) => {
-                //console.log('Client déconnecté depuis IPC dans le store:', data)
                 addConnectionEvent({
                     type: 'disconnect',
                     socketId: data.socketId,
                     timestamp: data.timestamp
-                })
-            })
+                });
+            });
         } else {
             console.warn('APIs Electron Socket.IO non disponibles')
         }
@@ -248,12 +362,17 @@ export const useSocketStore = defineStore('socket', () => {
         lastMessageTime: latestMessage.value?.timestamp || null
     }))
 
+
     return {
         // État
         serverStatus,
         messages,
         connectionHistory,
         debugMode,
+        isReceivingMessages,
+        IPCActivated,
+        maxTimestampValue,
+        timeStampAtStop,
 
         // Getters
         isServerRunning,
@@ -266,6 +385,7 @@ export const useSocketStore = defineStore('socket', () => {
         logMessages,
         recentMessages,
         getStatistics,
+        getMaxTimestampValue,
 
         // Actions
         updateServerStatus,
@@ -279,6 +399,8 @@ export const useSocketStore = defineStore('socket', () => {
         initializeSocketListeners,
         cleanup,
         toggleDebugMode,
-        addDebugMessage
+        addDebugMessage,
+        toggleIPCReception,
+        setMaxTimestampValue
     }
 })
