@@ -35,7 +35,7 @@ function createWindow() {
     }
 
     // Définir le facteur de zoom à 50%
-    mainWindow.webContents.setZoomFactor(0.5);
+    mainWindow.webContents.setZoomFactor(0.8);
 
     // Afficher la fenêtre quand elle est prête
     mainWindow.once('ready-to-show', () => {

@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-app-bar app color="primary" dark>
+    <v-app-bar app color="primary" dark density="compact">
       <v-app-bar-title>
         <v-icon left>mdi-file-document-outline</v-icon>
         BeautifuLog

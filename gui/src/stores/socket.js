@@ -11,74 +11,7 @@ export const useSocketStore = defineStore('socket', () => {
 
     const messages = ref([])
 
-    //add some debug message for testing
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'variable',
-        variables:
-        {
-            toto: "4ms",
 
-        }
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'json',
-        jsonData: {
-            temperature: "22 °C",
-            humidity: "45 %",
-            pressure: "1013 hPa",
-            happinessIndex: 87
-        }
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'log-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'error-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'warning-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'info-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
 
 
 
@@ -404,3 +337,95 @@ export const useSocketStore = defineStore('socket', () => {
         setMaxTimestampValue
     }
 })
+
+
+
+
+
+/*
+
+    //add some debug message for testing
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'variable',
+        variables:
+        {
+            toto: "4ms",
+
+        }
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'json',
+        jsonData: {
+            temperature: "22 °C",
+            humidity: "45 %",
+            pressure: "1013 hPa",
+            happinessIndex: 87
+        }
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'log-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'error-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'warning-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'info-message',
+        label: 'Process B',
+        msg: 'This is a debug log message from Process A.',
+        format: 'string',
+
+    })
+
+    messages.value.push({
+        id: 1,
+        timestamp: new Date().toISOString(),
+        type: 'info-message',
+        label: 'Process A',
+        msg: 'This is a debug log message from Process A.',
+        format: 'variable',
+        variables:
+        {
+            toto: "10 ms",
+
+        }
+
+    })
+
+    */

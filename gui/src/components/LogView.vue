@@ -1,19 +1,11 @@
-
 <template>
   <v-card class="log-view">
     <v-card-title class="d-flex justify-space-between align-center">
-      <v-expansion-panels>
-        <v-expansion-panel>
-          <v-expansion-panel-title>
+      <v-expansion-panels class="my-0 py-0">
+        <v-expansion-panel class="my-0 py-0">
+          <v-expansion-panel-title class="my-0 py-0">
             <span>{{ label }}</span>
-            <v-btn
-              icon="mdi-arrow-down-bold-circle"
-              size="x-small"
-              variant="text"
-              class="ml-2"
-              title="Défiler vers le bas"
-              @click="scrollToBottom(true)"
-            ></v-btn>
+
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <v-chip-group
@@ -78,7 +70,7 @@
           <template v-slot:prepend>
             <v-icon size="x-small">mdi-pin</v-icon>
           </template>
-          <span class="font-weight-medium">{{ varName }}:</span>
+          <span class="font-weight-medium">{{ varName }}=</span>
           <span class="ml-1">{{ varInfo.value }}</span>
           <template v-if="varInfo.updates > 0" v-slot:append> </template>
           <v-tooltip activator="parent" location="bottom">
@@ -119,19 +111,27 @@
               >
                 {{ message.type.replace("-message", "") }}
               </span>
+              <span v-if="message.format != 'string'" class="type-label">
+                {{ message.format }}
+              </span>
             </div>
             <div class="message-data">
               <pre v-if="isJsonData(message.msg)" class="json-data">{{
                 formatJson(message.msg)
               }}</pre>
               <template v-else-if="message.format === 'json'">
-                <div class="json-message">
-                  <JsonViewer :data="message.jsonData" />
+                <div>
+                  {{ message.msg }}
+                  <span
+                    class="open-json variable-link variable-badge"
+                    @click="openJsonModal(message.jsonData)"
+                    >Click to view JSON</span
+                  >
                 </div>
               </template>
               <template v-else-if="message.format === 'variable'">
                 <div class="variable-message">
-                  <span>{{ message.msg }}</span>
+                  {{ message.msg }}
                   <div class="variables-container">
                     <template
                       v-for="(value, varName) in message.variables"
@@ -143,7 +143,9 @@
                         @click="pinVariable(varName, value, message.timestamp)"
                       >
                         {{ varName }}: {{ value }}
+                        <v-icon size="x-small" class="ml-1">mdi-pin</v-icon>
                       </span>
+
                       <span v-else class="variable-badge variable-badge-pinned">
                         {{ varName }}
                       </span>
@@ -157,6 +159,21 @@
         </template>
       </v-virtual-scroll>
     </v-card-text>
+
+    <v-dialog v-model="modalJsonOpen" max-width="600" class="json-message">
+      <v-card>
+        <v-card-title class="headline">JSON Viewer</v-card-title>
+        <v-card-text>
+          <JsonViewer :data="modalJsonModel" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" text @click="modalJsonOpen = false"
+            >Close</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-card>
 </template>
 
@@ -547,11 +564,24 @@ const isJsonData = (msg) => {
 const formatJson = (msg) => {
   return JSON.stringify(msg, null, 2);
 };
+
+// État réactif pour le message survolé
+const hoveredMessage = ref(null);
+
+// État pour le modal d'affichage du JSON
+const modalJsonOpen = ref(false);
+const modalJsonModel = ref(null);
+
+// Fonction pour ouvrir le modal avec les données JSON
+const openJsonModal = (jsonData) => {
+  modalJsonModel.value = jsonData;
+  modalJsonOpen.value = true;
+};
 </script>
 
 <style scoped>
 .log-content-area {
-  height: 435px;
+  max-height: 435px;
   width: 100%;
   min-height: 0;
   display: flex;
@@ -573,6 +603,8 @@ const formatJson = (msg) => {
 }
 
 .message-content {
+  padding: 0px;
+  margin: 0px;
   font-size: 0.875rem !important;
   color: black;
   box-sizing: border-box;
@@ -625,8 +657,6 @@ const formatJson = (msg) => {
   overflow-y: auto;
 }
 
-
-
 .variable-message {
   padding: 4px 0;
 }
@@ -665,17 +695,14 @@ const formatJson = (msg) => {
 }
 
 .json-message {
-  position:absolute;
-  z-index: 10;
   padding: 8px;
   border-radius: 4px;
-  background-color: rgb(225, 241, 255);
   margin: 4px 0;
   border-left: 3px solid rgba(33, 150, 243, 0.3);
 }
 
 .variables-container {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
 }

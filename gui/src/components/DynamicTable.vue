@@ -1,16 +1,19 @@
 <template>
-  <v-container fluid class="dynamic-table pa-4" style="height: 100%">
-    <v-row class="my-0 py-0">
+  <v-container fluid class="dynamic-table pa-2 my-0" style="height: 100%">
+    <v-row class="my-0 py-0 ">
       <v-col cols="12" class="py-0">
-        <v-card>
-          <v-card-title class="d-flex justify-space-between align-center">
-            <h3>Vue des Logs par Process</h3>
+        <v-card class="py-0">
+          <v-card-title class="d-flex inline-flex justify-space-between align-center title-bar">
+            <b>Vue des Logs par Process</b>
             {{ socketStore.maxTimestampValue.toFixed(0) - socketStore.timeStampAtStop.toFixed(0) }} ms
             <v-slider
               v-if="!socketStore.IPCActivated"
               v-model="socketStore.maxTimestampValue"
               :min="socketStore.timeStampAtStop - 10000"
               :max="socketStore.timeStampAtStop"
+              density="compact"
+              label="go back in time"
+              class="my-0 py-0"
             >
             </v-slider>
             <div class="d-flex align-center">
@@ -48,7 +51,7 @@
       </v-col>
     </v-row>
 
-    <v-row v-if="uniqueLabels.length === 0" class="mt-0 py-0">
+    <v-row v-if="uniqueLabels.length === 0" class="mt-0 py-0 ">
       <v-col cols="12" class="pt-2">
         <v-card class="text-center pa-4">
           <v-icon size="64" color="grey-lighten-1" class="mb-4">
@@ -63,12 +66,12 @@
       </v-col>
     </v-row>
 
-    <v-row v-else class="mt-4 flex-grow-1">
+    <v-row v-else class="mt-1 py-1 flex-grow-1">
       <v-col
         v-for="label in uniqueLabels"
         :key="label"
         :cols="getColumnSize()"
-        class="column-container"
+        class="column-container my-0 py-0"
       >
         <div class="log-column">
           <LogView :label="label" @hide="hideLabel" />
@@ -283,6 +286,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.title-bar {
+  font-size: medium;
+  margin : 1px;
+  padding: 5px;
+}
+
+
 .dynamic-table {
   margin-top: 0px;
   height: 95%;
