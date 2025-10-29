@@ -1,4 +1,4 @@
-const  ChainHandler  = require('./ChainHandler.js');
+const ChainHandler = require('./ChainHandler.js');
 //LABEL is the system origin of the log. It can be any string. Default one is LOG
 // Data is an array of objects with at least a 'msg' property
 
@@ -25,7 +25,20 @@ class DetectLabelHandler extends ChainHandler {
         } else {
             item.label = 'log';
         }
-        //Do not return as we modify the item directly
+
+        // Detect now if the item.msg start is SUBLABEL : something like "SUBLABEL: actual message", or "SUB LABEL : something"
+        // This mean there is text before the first ":" that does not contain special characters, only letters, numbers, spaces 
+        const subLabelRegex = /^\s*([a-zA-Z0-9_ ]+)\s*:\s*/;
+        const subMatch = item.msg.match(subLabelRegex);
+
+        if (subMatch) {
+            item.subLabel = subMatch[1].trim();
+            item.msg = item.msg.slice(subMatch[0].length).trim();
+        } else {
+            item.subLabel = null;
+        }
+
+
     }
 }
 

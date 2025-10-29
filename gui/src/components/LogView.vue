@@ -5,7 +5,6 @@
         <v-expansion-panel class="my-0 py-0">
           <v-expansion-panel-title class="my-0 py-0">
             <span>{{ label }}</span>
-
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <v-chip-group
@@ -113,6 +112,9 @@
               </span>
               <span v-if="message.format != 'string'" class="type-label">
                 {{ message.format }}
+              </span>
+              <span v-if="message.subLabel" class="type-label sublabel">
+                {{ message.subLabel }}
               </span>
             </div>
             <div class="message-data">
@@ -741,6 +743,12 @@ const openJsonModal = (jsonData) => {
   background: rgba(76, 175, 80, 0.15);
   color: #388e3c;
 }
+
+.type-label.sublabel {
+  background: #0b6275;
+  color: #b6e7f3;
+}
+
 .label-label {
   background: #eee;
   color: #333;
