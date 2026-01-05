@@ -7,15 +7,8 @@
 
     <v-card-text>
       <div class="mb-4">
-        <v-chip
-          :color="getServerStatusColor()"
-          variant="elevated"
-          class="mr-2"
-        >
-          <v-icon
-            :icon="getServerStatusIcon()"
-            class="mr-1"
-          ></v-icon>
+        <v-chip :color="getServerStatusColor()" variant="elevated" class="mr-2">
+          <v-icon :icon="getServerStatusIcon()" class="mr-1"></v-icon>
           {{ getServerStatusText() }}
         </v-chip>
 
@@ -186,7 +179,8 @@
             <v-btn
               @click="sendBroadcast"
               :disabled="
-                !broadcastMessage.trim() || getSocketInput()?.status !== 'connected'
+                !broadcastMessage.trim() ||
+                getSocketInput()?.status !== 'connected'
               "
               color="primary"
               block
@@ -269,27 +263,31 @@ const getMessageTypeColor = (type) => {
 };
 
 const getServerStatusText = () => {
-  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
-  
+  const socketInput = socketStore.inputsStatus.find(
+    (input) => input.name === "Socket.IO"
+  );
+
   if (!socketInput) {
     return "Serveur non configuré";
   }
-  
+
   const { status, config, connectedClients } = socketInput;
   const port = config?.port || 0;
-  
+
   switch (status) {
-    case 'connected':
+    case "connected":
       if (connectedClients > 0) {
-        return `En ligne - ${connectedClients} client${connectedClients > 1 ? 's' : ''} connecté${connectedClients > 1 ? 's' : ''}`;
+        return `En ligne - ${connectedClients} client${
+          connectedClients > 1 ? "s" : ""
+        } connecté${connectedClients > 1 ? "s" : ""}`;
       } else {
         return `Serveur en marche, en attente de connexion sur le port ${port}`;
       }
-    case 'connecting':
+    case "connecting":
       return `Démarrage du serveur sur le port ${port}...`;
-    case 'disconnected':
+    case "disconnected":
       return "Serveur arrêté";
-    case 'error':
+    case "error":
       return "Erreur serveur";
     default:
       return "État inconnu";
@@ -297,49 +295,55 @@ const getServerStatusText = () => {
 };
 
 const getServerStatusColor = () => {
-  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
-  
+  const socketInput = socketStore.inputsStatus.find(
+    (input) => input.name === "Socket.IO"
+  );
+
   if (!socketInput) {
     return "grey";
   }
-  
+
   switch (socketInput.status) {
-    case 'connected':
-      return socketInput.connectedClients > 0 ? 'success' : 'warning';
-    case 'connecting':
-      return 'info';
-    case 'disconnected':
-      return 'grey';
-    case 'error':
-      return 'error';
+    case "connected":
+      return socketInput.connectedClients > 0 ? "success" : "warning";
+    case "connecting":
+      return "info";
+    case "disconnected":
+      return "grey";
+    case "error":
+      return "error";
     default:
-      return 'grey';
+      return "grey";
   }
 };
 
 const getServerStatusIcon = () => {
-  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
-  
+  const socketInput = socketStore.inputsStatus.find(
+    (input) => input.name === "Socket.IO"
+  );
+
   if (!socketInput) {
     return "mdi-help-circle";
   }
-  
+
   switch (socketInput.status) {
-    case 'connected':
-      return socketInput.connectedClients > 0 ? 'mdi-check-circle' : 'mdi-clock-outline';
-    case 'connecting':
-      return 'mdi-loading mdi-spin';
-    case 'disconnected':
-      return 'mdi-close-circle';
-    case 'error':
-      return 'mdi-alert-circle';
+    case "connected":
+      return socketInput.connectedClients > 0
+        ? "mdi-check-circle"
+        : "mdi-clock-outline";
+    case "connecting":
+      return "mdi-loading mdi-spin";
+    case "disconnected":
+      return "mdi-close-circle";
+    case "error":
+      return "mdi-alert-circle";
     default:
-      return 'mdi-help-circle';
+      return "mdi-help-circle";
   }
 };
 
 const getSocketInput = () => {
-  return socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
+  return socketStore.inputsStatus.find((input) => input.name === "Socket.IO");
 };
 
 const formatTime = (timestamp) => {

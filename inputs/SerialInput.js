@@ -181,38 +181,38 @@ class SerialInput extends LogInput {
                 // Sur macOS, inclure tous les ports qui semblent être des périphériques USB série
                 const path = port.path.toLowerCase();
                 const manufacturer = (port.manufacturer || '').toLowerCase();
-                
+
                 // Critères de sélection plus larges
-                const isUsbSerial = path.includes('/dev/tty.usb') || 
-                                   path.includes('/dev/tty.wchusb') ||
-                                   path.includes('/dev/tty.usbmodem') ||
-                                   path.includes('/dev/tty.usbserial');
-                
+                const isUsbSerial = path.includes('/dev/tty.usb') ||
+                    path.includes('/dev/tty.wchusb') ||
+                    path.includes('/dev/tty.usbmodem') ||
+                    path.includes('/dev/tty.usbserial');
+
                 const hasKnownManufacturer = manufacturer.includes('arduino') ||
-                                           manufacturer.includes('usb') ||
-                                           manufacturer.includes('serial') ||
-                                           manufacturer.includes('ch340') ||
-                                           manufacturer.includes('cp210') ||
-                                           manufacturer.includes('ftdi') ||
-                                           manufacturer.includes('prolific') ||
-                                           manufacturer.includes('silicon');
-                
+                    manufacturer.includes('usb') ||
+                    manufacturer.includes('serial') ||
+                    manufacturer.includes('ch340') ||
+                    manufacturer.includes('cp210') ||
+                    manufacturer.includes('ftdi') ||
+                    manufacturer.includes('prolific') ||
+                    manufacturer.includes('silicon');
+
                 // Exclure les ports Bluetooth et système
                 const isBluetoothOrSystem = path.includes('bluetooth') ||
-                                          path.includes('blth') ||
-                                          path === '/dev/tty.bluetooth-incoming-port';
-                
+                    path.includes('blth') ||
+                    path === '/dev/tty.bluetooth-incoming-port';
+
                 return (isUsbSerial || hasKnownManufacturer) && !isBluetoothOrSystem;
             });
-            
+
             // Si aucun port avec les critères habituels, inclure tous les ports /dev/tty.* sauf Bluetooth
             if (this.availablePorts.length === 0) {
                 this.availablePorts = ports.filter(port => {
                     const path = port.path.toLowerCase();
-                    return path.startsWith('/dev/tty.') && 
-                           !path.includes('bluetooth') && 
-                           !path.includes('blth') &&
-                           path !== '/dev/tty.bluetooth-incoming-port';
+                    return path.startsWith('/dev/tty.') &&
+                        !path.includes('bluetooth') &&
+                        !path.includes('blth') &&
+                        path !== '/dev/tty.bluetooth-incoming-port';
                 });
             }
         } catch (error) {
