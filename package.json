@@ -8,7 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "start": "npm run build && electron .",
-        "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+        "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
         "electron:build": "npm run build && electron-builder",
         "postinstall": "electron-builder install-app-deps",
         "test:socket": "node Test/test-socket-client.js"
@@ -33,6 +33,7 @@
     "dependencies": {
         "@mdi/font": "^7.3.67",
         "pinia": "^3.0.3",
+        "serialport": "^12.0.0",
         "socket.io": "^4.8.1",
         "vue": "^3.3.8",
         "vuetify": "^3.4.7"

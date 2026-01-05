@@ -3,7 +3,7 @@
     <v-app-bar app color="primary" dark density="compact">
       <v-app-bar-title>
         <v-icon left>mdi-file-document-outline</v-icon>
-        BeautifuLog
+        BeautifuLoggg
       </v-app-bar-title>
 
       <v-spacer></v-spacer>
@@ -116,16 +116,23 @@
       </v-card>
     </v-dialog>
 
-    <!-- Modal SocketManager -->
-    <v-dialog v-model="socketModal" max-width="800px">
+    <!-- Modal InputManager -->
+    <v-dialog
+      v-model="socketModal"
+      max-width="90vw"
+      max-height="90vh"
+      scrollable
+    >
       <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
-          <span>Socket Manager</span>
+          <span>Gestionnaire d'Entrées</span>
           <v-btn icon @click="socketModal = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-card-title>
-        <v-card-text>
+        <v-card-text class="pa-0">
+          <InputManager />
+          <v-divider class="my-4"></v-divider>
           <SocketManager />
         </v-card-text>
       </v-card>
@@ -141,6 +148,7 @@ import { useThemeStore } from "./stores/theme.js";
 import WelcomeCard from "./components/WelcomeCard.vue";
 import FeatureCard from "./components/FeatureCard.vue";
 import SocketManager from "./components/SocketManager.vue";
+import InputManager from "./components/InputManager.vue";
 import StoreViewer from "./components/StoreViewer.vue";
 import DynamicTable from "./components/DynamicTable.vue";
 import DebugHelp from "./components/DebugHelp.vue";

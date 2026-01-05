@@ -2,63 +2,60 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useSocketStore = defineStore('socket', () => {
-    // État
-    const serverStatus = ref({
-        isRunning: false,
-        port: 0,
-        connectedClients: 0
-    })
+    // État pour les inputs
+    const inputsStatus = ref([])
 
+    // État pour les messages (reste identique)
     const messages = ref([])
-
-
-
-
-
-
-
-
-
     const connectionHistory = ref([])
-    const debugMode = ref(true) // Mode debug activé par défaut pour le développement
+    const debugMode = ref(true)
 
     let messageIdCounter = 0
 
     // État pour contrôler la réception des messages
-    const isReceivingMessages = ref(true);
+    const isReceivingMessages = ref(true)
+    const IPCActivated = ref(true)
+    const timeStampAtStop = ref(0)
 
-    // État pour contrôler l'activation des commandes IPC
-    const IPCActivated = ref(true);
-
-    const timeStampAtStop = ref(0);
-
-    console.log("Valeur initiale de IPCActivated dans le store:", IPCActivated.value);
+    console.log("Valeur initiale de IPCActivated dans le store:", IPCActivated.value)
 
     // Action pour activer/désactiver la réception des messages depuis le backend
     const toggleIPCReception = (enable) => {
-        IPCActivated.value = enable;
+        IPCActivated.value = enable
         if (!enable) {
-            maxTimestampValue.value = new Date().getTime();
-            timeStampAtStop.value = maxTimestampValue.value;
+            maxTimestampValue.value = new Date().getTime()
+            timeStampAtStop.value = maxTimestampValue.value
         }
-        console.log("maxTimestampValue après toggleIPCReception:", maxTimestampValue.value);
-        console.log(`Réception des messages depuis le backend ${enable ? 'activée' : 'désactivée'}`);
-    };
+        console.log("maxTimestampValue après toggleIPCReception:", maxTimestampValue.value)
+        console.log(`Réception des messages depuis le backend ${enable ? 'activée' : 'désactivée'}`)
+    }
 
     // Nouvelle valeur partagée pour maxTimestampValue
-    const maxTimestampValue = ref(0);
+    const maxTimestampValue = ref(0)
 
     // Getter pour accéder à maxTimestampValue
-    const getMaxTimestampValue = computed(() => maxTimestampValue.value);
+    const getMaxTimestampValue = computed(() => maxTimestampValue.value)
 
     // Setter pour mettre à jour maxTimestampValue
     const setMaxTimestampValue = (value) => {
-        maxTimestampValue.value = value;
-        console.log('maxTimestampValue mis à jour:', value);
-    };
+        maxTimestampValue.value = value
+        console.log('maxTimestampValue mis à jour:', value)
+    }
 
-    // Getters (computed)
-    const isServerRunning = computed(() => serverStatus.value.isRunning)
+    // Getters (computed) - adaptés pour la nouvelle architecture
+    const isServerRunning = computed(() => {
+        return inputsStatus.value.some(input => input.status === 'connected')
+    })
+
+    const serverStatus = computed(() => {
+        const socketInput = inputsStatus.value.find(input => input.name === 'Socket.IO')
+        return {
+            isRunning: socketInput?.status === 'connected' || false,
+            port: socketInput?.config?.port || 0,
+            connectedClients: socketInput?.connectedClients || 0
+        }
+    })
+
     const messageCount = computed(() => messages.value.length)
     const latestMessage = computed(() => messages.value[0] || null)
 
@@ -100,6 +97,7 @@ export const useSocketStore = defineStore('socket', () => {
         messages.value.filter(msg => msg.type === 'error-message')
     )
 
+
     const logMessages = computed(() =>
         messages.value.filter(msg => msg.type === 'log-message')
     )
@@ -108,19 +106,25 @@ export const useSocketStore = defineStore('socket', () => {
         messages.value.slice(0, 50)
     )
 
-    // Actions
-    const updateServerStatus = async () => {
+    // Actions - adaptées pour la nouvelle architecture
+    const updateInputsStatus = async () => {
         try {
-            if (window.electronAPI?.socket?.getStatus) {
-                const status = await window.electronAPI.socket.getStatus()
-                serverStatus.value = status
+            if (window.electronAPI?.inputs?.getStatus) {
+                const status = await window.electronAPI.inputs.getStatus()
+                inputsStatus.value = status
                 return status
             }
-            return null
+            return []
         } catch (error) {
-            console.error('Erreur lors de la récupération du statut du serveur:', error)
-            return null
+            console.error('Erreur lors de la récupération du statut des inputs:', error)
+            return []
         }
+    }
+
+    // Méthode legacy pour compatibilité
+    const updateServerStatus = async () => {
+        await updateInputsStatus()
+        return serverStatus.value
     }
 
     const addMessages = (messageArray) => {
@@ -190,8 +194,8 @@ export const useSocketStore = defineStore('socket', () => {
 
     const broadcastMessage = async (message) => {
         try {
-            if (window.electronAPI?.socket?.broadcast) {
-                const result = await window.electronAPI.socket.broadcast(message)
+            if (window.electronAPI?.inputs?.broadcast) {
+                const result = await window.electronAPI.inputs.broadcast(message)
                 console.log('Message diffusé:', result)
                 return result
             }
@@ -215,41 +219,67 @@ export const useSocketStore = defineStore('socket', () => {
         }
     }
 
-    // Initialisation des écouteurs IPC
-    const initializeSocketListeners = () => {
-        if (window.electronAPI?.socket) {
-            console.log('Initialisation des écouteurs Socket.IO dans le store')
+    // Initialisation des écouteurs IPC - adaptée pour tous les inputs
+    const initializeInputListeners = () => {
+        if (window.electronAPI?.inputs) {
+            console.log('Initialisation des écouteurs d\'inputs dans le store')
 
-            // Écouter les messages reçus via Socket.IO
-            window.electronAPI.socket.onMessageReceived((data) => {
+            // Écouter les messages reçus de tous les inputs
+            window.electronAPI.inputs.onMessageReceived((data) => {
                 if (IPCActivated.value) {
-                    addMessage(data);
-                    if (data.timestamp && data.timestamp > maxTimestampValue.value) {
-                        setMaxTimestampValue(data.timestamp);
+                    addMessage(data)
+                    if (data.receivedAt && data.receivedAt > maxTimestampValue.value) {
+                        setMaxTimestampValue(data.receivedAt)
                     }
                 } else {
-                    console.log('Message ignoré car la réception depuis le backend est désactivée:', data);
+                    console.log('Message ignoré car la réception depuis le backend est désactivée:', data)
                 }
-            });
+            })
 
-            // Écouter les déconnexions de clients
-            window.electronAPI.socket.onClientDisconnected((data) => {
+            // Écouter les changements de statut des inputs
+            window.electronAPI.inputs.onStatusChanged((data) => {
                 addConnectionEvent({
-                    type: 'disconnect',
-                    socketId: data.socketId,
-                    timestamp: data.timestamp
-                });
-            });
+                    type: 'input-status',
+                    inputName: data.name,
+                    oldStatus: data.oldStatus,
+                    newStatus: data.newStatus,
+                    error: data.error,
+                    timestamp: new Date().toISOString()
+                })
+
+                // Mettre à jour le statut des inputs
+                updateInputsStatus()
+            })
+
+            // Écouter les changements de clients
+            window.electronAPI.inputs.onClientChanged((data) => {
+                addConnectionEvent({
+                    type: 'client-change',
+                    inputName: data.name,
+                    oldCount: data.oldCount,
+                    newCount: data.newCount,
+                    timestamp: new Date().toISOString()
+                })
+
+                // Mettre à jour le statut des inputs
+                updateInputsStatus()
+            })
         } else {
-            console.warn('APIs Electron Socket.IO non disponibles')
+            console.warn('APIs Electron Inputs non disponibles')
         }
     }
 
+    // Méthode legacy pour compatibilité
+    const initializeSocketListeners = () => {
+        initializeInputListeners()
+    }
+
     const cleanup = () => {
-        if (window.electronAPI?.socket) {
-            window.electronAPI.socket.removeAllListeners('socket-message-received')
-            window.electronAPI.socket.removeAllListeners('socket-client-disconnected')
-            console.log('Écouteurs Socket.IO nettoyés')
+        if (window.electronAPI?.inputs) {
+            window.electronAPI.inputs.removeAllListeners('input-message-received')
+            window.electronAPI.inputs.removeAllListeners('input-status-changed')
+            window.electronAPI.inputs.removeAllListeners('input-client-changed')
+            console.log('Écouteurs d\'inputs nettoyés')
         }
     }
 
@@ -298,6 +328,7 @@ export const useSocketStore = defineStore('socket', () => {
 
     return {
         // État
+        inputsStatus,
         serverStatus,
         messages,
         connectionHistory,
@@ -321,14 +352,17 @@ export const useSocketStore = defineStore('socket', () => {
         getMaxTimestampValue,
 
         // Actions
+        updateInputsStatus,
         updateServerStatus,
         addMessage,
+        addMessages,
         addConnectionEvent,
         clearMessages,
         clearConnectionHistory,
         clearAll,
         broadcastMessage,
         getConnectedClients,
+        initializeInputListeners,
         initializeSocketListeners,
         cleanup,
         toggleDebugMode,
@@ -337,9 +371,6 @@ export const useSocketStore = defineStore('socket', () => {
         setMaxTimestampValue
     }
 })
-
-
-
 
 
 /*

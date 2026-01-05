@@ -1,14 +1,12 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const { Server } = require('socket.io');
-const http = require('http');
 const isDev = process.env.NODE_ENV === 'development';
 const { formatMessage } = require('./formatMessage');
+const InputManager = require('./inputs/InputManager');
 
-// Configuration du serveur Socket.IO
-const socketPort = 3001;
+// Configuration globale
 let mainWindow;
-let socketServer;
+let inputManager;
 
 function createWindow() {
     // Créer la fenêtre du navigateur
@@ -49,118 +47,204 @@ function createWindow() {
     });
 }
 
-// Créer le serveur Socket.IO
-function createSocketServer() {
-    const server = http.createServer();
-    socketServer = new Server(server, {
-        cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
+// Initialiser tous les inputs
+async function initializeInputs() {
+    inputManager = new InputManager();
+
+    // Configuration des inputs
+    const config = {
+        socket: {
+            port: 3001
+        },
+        serial: {
+            baudRate: 9600,
+            autoReconnect: true
+        }
+    };
+
+    // Configurer les callbacks pour traiter les messages
+    inputManager.onMessage((data) => {
+        try {
+            handleInputMessage(data);
+        } catch (error) {
+            console.error('Erreur lors du traitement du message:', error.message, 'Data:', data);
         }
     });
 
-    // Gestion des connexions Socket.IO
-    socketServer.on('connection', (socket) => {
-        console.log('Nouvelle connexion Socket.IO:', socket.id);
+    inputManager.onStatusChange((data) => {
+        console.log(`Input ${data.name} changé de ${data.oldStatus} à ${data.newStatus}`);
 
-        // Écouter les messages personnalisés
-        socket.on('log-message', (data) => {
-            // Vérifier que data est uniquement un string
-            if (typeof data !== 'string') {
-                console.error('Le message doit être une chaîne de caractères');
-                return;
-            }
-
-            console.log('Message reçu via Socket.IO:', data);
-
-            try {
-                const formattedMessages = formatMessage(data);
-                //console.log('Message formaté:', formattedMessage);
-
-                formattedMessages.forEach(formattedMessage => {
-                    // Ajouter les métadonnées du socket
-                    formattedMessage.socketId = socket.id;
-                    formattedMessage.receivedAt = new Date().toISOString();
-                    formattedMessage.clientCount = socketServer.engine.clientsCount;
-
-
-                    // Transmettre le message au frontend via IPC
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send('socket-message-received', formattedMessage);
-                    }
-                });
-
-                // Voici le format de formattedMessage:         
-
-                //Voici le format de formattedMessage:
-                /*
-                {
-                    label: 'process1',
-                    type: 'log',
-                    msg: 'Ceci est un message de log de test avec le label process1',
-                    timestamp: '2024-06-10T12:34:56.789Z',
-                    socketId: 'abc123def456',
-                    receivedAt: '2024-06-10T12:34:56.789Z',
-                    clientCount: 1
-                }
-                 */
-
-
-
-            } catch (error) {
-                console.error('Erreur lors du formatage du message:', error.message);
-            }
-        });
-
-
-        // Gestion de la déconnexion
-        socket.on('disconnect', () => {
-            console.log('Déconnexion Socket.IO:', socket.id);
-
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('socket-client-disconnected', {
-                    socketId: socket.id,
-                    timestamp: new Date().toISOString()
-                });
-            }
-        });
+        // Notifier le frontend du changement de statut
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('input-status-changed', data);
+        }
     });
 
-    // Démarrer le serveur
-    server.listen(socketPort, () => {
-        console.log(`Serveur Socket.IO en écoute sur le port ${socketPort}`);
+    inputManager.onClientChange((data) => {
+        console.log(`Input ${data.name} clients: ${data.oldCount} → ${data.newCount}`);
+
+        // Notifier le frontend du changement de clients
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('input-client-changed', data);
+        }
     });
 
-    return server;
+    // Initialiser tous les inputs disponibles
+    await inputManager.initializeInputs(config);
+}
+
+// Gérer les messages reçus de tous les inputs
+function handleInputMessage(data) {
+    // Validation rapide des données (plus efficace qu'un try...catch)
+    if (!data || !data.rawMessage) {
+        return;
+    }
+
+    const formattedMessages = formatMessage(data.rawMessage);
+
+    formattedMessages.forEach(formattedMessage => {
+        // Ajouter les métadonnées de l'input
+        formattedMessage.inputSource = data.source;
+        formattedMessage.inputType = data.type;
+        formattedMessage.receivedAt = data.timestamp;
+
+        // Ajouter les métadonnées spécifiques selon le type
+        if (data.socketId) {
+            formattedMessage.socketId = data.socketId;
+        }
+        if (data.port) {
+            formattedMessage.serialPort = data.port;
+        }
+        if (data.clientCount) {
+            formattedMessage.clientCount = data.clientCount;
+        }
+
+        // Transmettre le message au frontend via IPC
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('input-message-received', formattedMessage);
+        }
+    });
 }
 
 // Handlers IPC pour la communication avec le frontend
 function setupIpcHandlers() {
-    // Handler pour obtenir le statut du serveur Socket.IO
-    ipcMain.handle('socket:getStatus', () => {
-        return {
-            isRunning: socketServer ? true : false,
-            port: socketPort,
-            connectedClients: socketServer ? socketServer.engine.clientsCount : 0
-        };
+    // Handler pour obtenir le statut de tous les inputs
+    ipcMain.handle('inputs:getStatus', () => {
+        return inputManager ? inputManager.getAllInputsStatus() : [];
     });
 
-    // Handler pour envoyer un message à tous les clients connectés
-    ipcMain.handle('socket:broadcast', (event, message) => {
-        if (socketServer) {
-            socketServer.emit('broadcast-message', message);
-            return { success: true, message: 'Message diffusé à tous les clients' };
+    // Handler pour diffuser un message à tous les inputs connectés
+    ipcMain.handle('inputs:broadcast', async (event, message) => {
+        if (inputManager) {
+            const results = await inputManager.broadcastToAll(message);
+            return { success: true, results };
         }
-        return { success: false, message: 'Serveur Socket.IO non disponible' };
+        return { success: false, message: 'Input manager non disponible' };
     });
 
-    // Handler pour obtenir la liste des clients connectés
-    ipcMain.handle('socket:getClients', () => {
-        if (socketServer) {
-            const clients = Array.from(socketServer.sockets.sockets.keys());
-            return clients;
+    // Handler pour redémarrer un input spécifique
+    ipcMain.handle('inputs:restart', async (event, inputName) => {
+        if (inputManager) {
+            const success = await inputManager.restartInput(inputName);
+            return { success, message: success ? 'Input redémarré' : 'Échec du redémarrage' };
+        }
+        return { success: false, message: 'Input manager non disponible' };
+    });
+
+    // Handler pour obtenir les détails d'un input spécifique
+    ipcMain.handle('inputs:getDetails', (event, inputName) => {
+        if (inputManager) {
+            const input = inputManager.getInput(inputName);
+            return input ? input.getStatus() : null;
+        }
+        return null;
+    });
+
+    // Handler pour obtenir les clients connectés d'un input
+    ipcMain.handle('inputs:getClients', (event, inputName) => {
+        if (inputManager) {
+            const input = inputManager.getInput(inputName);
+            if (input && typeof input.getConnectedClients === 'function') {
+                return input.getConnectedClients();
+            }
         }
         return [];
+    });
+
+    // Handler pour lister les ports série disponibles
+    ipcMain.handle('serial:listPorts', async () => {
+        if (inputManager) {
+            const serialInput = inputManager.getInput('Serial');
+            if (serialInput) {
+                try {
+                    // Utiliser la méthode publique pour lister les ports
+                    const ports = await serialInput.listAvailablePorts();
+                    return {
+                        success: true,
+                        ports: ports
+                    };
+                } catch (error) {
+                    return {
+                        success: false,
+                        message: error.message,
+                        ports: []
+                    };
+                }
+            }
+        }
+        return { success: false, message: 'Serial input non disponible', ports: [] };
+    });
+
+    // Handler pour se connecter à un port série spécifique
+    ipcMain.handle('serial:connectToPort', async (event, portPath, config = {}) => {
+        if (inputManager) {
+            const serialInput = inputManager.getInput('Serial');
+            if (serialInput) {
+                try {
+                    // Arrêter la connexion actuelle si elle existe
+                    if (serialInput.status === 'connected') {
+                        await serialInput.stop();
+                    }
+
+                    // Mettre à jour la configuration
+                    serialInput.config.port = portPath;
+                    if (config.baudRate) serialInput.config.baudRate = config.baudRate;
+                    if (config.dataBits) serialInput.config.dataBits = config.dataBits;
+                    if (config.stopBits) serialInput.config.stopBits = config.stopBits;
+                    if (config.parity) serialInput.config.parity = config.parity;
+
+                    // Démarrer avec le nouveau port
+                    await serialInput.start();
+
+                    return {
+                        success: true,
+                        message: `Connecté au port ${portPath}`
+                    };
+                } catch (error) {
+                    return {
+                        success: false,
+                        message: error.message
+                    };
+                }
+            }
+        }
+        return { success: false, message: 'Serial input non disponible' };
+    });
+
+    // Handler pour configurer un port série sans s'y connecter
+    ipcMain.handle('serial:configure', (event, config) => {
+        if (inputManager) {
+            const serialInput = inputManager.getInput('Serial');
+            if (serialInput) {
+                // Mettre à jour la configuration
+                Object.assign(serialInput.config, config);
+                return {
+                    success: true,
+                    message: 'Configuration mise à jour'
+                };
+            }
+        }
+        return { success: false, message: 'Serial input non disponible' };
     });
 
     // Handler pour recevoir un message du frontend et le traiter
@@ -175,7 +259,8 @@ function setupIpcHandlers() {
             const enrichedMessages = formattedMessages.map((formattedMessage) => ({
                 ...formattedMessage,
                 processedAt: new Date().toISOString(),
-                source: 'backend'
+                inputSource: 'frontend',
+                inputType: 'manual'
             }));
 
             console.log('Messages formatés et enrichis:', enrichedMessages);
@@ -191,17 +276,17 @@ function setupIpcHandlers() {
 
 // Cette méthode sera appelée quand Electron aura fini
 // de s'initialiser et sera prêt à créer des fenêtres de navigateur.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     createWindow();
-    createSocketServer();
     setupIpcHandlers();
+    await initializeInputs();
 });
 
 // Quitter quand toutes les fenêtres sont fermées
-app.on('window-all-closed', () => {
-    // Fermer le serveur Socket.IO
-    if (socketServer) {
-        socketServer.close();
+app.on('window-all-closed', async () => {
+    // Arrêter tous les inputs
+    if (inputManager) {
+        await inputManager.stopAllInputs();
     }
 
     // Quitter l'application même sur macOS

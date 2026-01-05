@@ -20,7 +20,7 @@ function formatMessage(rawMessages) {
         { msg: rawMessages }
     ]
 
-    console.log('Raw data for formatting:', data);
+    //console.log('Raw data for formatting:', data);
 
     // Créer la chaîne de responsabilité
     const detectLabelHandler = new DetectLabelHandler();

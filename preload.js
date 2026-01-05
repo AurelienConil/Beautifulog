@@ -12,32 +12,58 @@ contextBridge.exposeInMainWorld('electronAPI', {
         electron: process.versions.electron
     }),
 
-    // APIs Socket.IO
-    socket: {
-        // Obtenir le statut du serveur
-        getStatus: () => ipcRenderer.invoke('socket:getStatus'),
+    // APIs pour la gestion des inputs
+    inputs: {
+        // Obtenir le statut de tous les inputs
+        getStatus: () => ipcRenderer.invoke('inputs:getStatus'),
 
-        // Diffuser un message à tous les clients
-        broadcast: (message) => ipcRenderer.invoke('socket:broadcast', message),
+        // Diffuser un message à tous les inputs connectés
+        broadcast: (message) => ipcRenderer.invoke('inputs:broadcast', message),
 
-        // Obtenir la liste des clients connectés
-        getClients: () => ipcRenderer.invoke('socket:getClients'),
+        // Redémarrer un input spécifique
+        restart: (inputName) => ipcRenderer.invoke('inputs:restart', inputName),
 
-        // Écouter les messages reçus via Socket.IO
+        // Obtenir les détails d'un input spécifique
+        getDetails: (inputName) => ipcRenderer.invoke('inputs:getDetails', inputName),
+
+        // Obtenir les clients connectés d'un input
+        getClients: (inputName) => ipcRenderer.invoke('inputs:getClients', inputName),
+
+        // Écouter les messages reçus de tous les inputs
         onMessageReceived: (callback) => {
-            ipcRenderer.on('socket-message-received', (event, data) => callback(data));
+            ipcRenderer.on('input-message-received', (event, data) => callback(data));
         },
 
-        // Écouter les déconnexions de clients
-        onClientDisconnected: (callback) => {
-            ipcRenderer.on('socket-client-disconnected', (event, data) => callback(data));
+        // Écouter les changements de statut des inputs
+        onStatusChanged: (callback) => {
+            ipcRenderer.on('input-status-changed', (event, data) => callback(data));
+        },
+
+        // Écouter les changements de clients
+        onClientChanged: (callback) => {
+            ipcRenderer.on('input-client-changed', (event, data) => callback(data));
         },
 
         // Retirer les écouteurs
         removeAllListeners: (channel) => {
             ipcRenderer.removeAllListeners(channel);
-        },
+        }
+    },
 
+    // API pour la gestion des ports série
+    serial: {
+        // Lister les ports série disponibles
+        listPorts: () => ipcRenderer.invoke('serial:listPorts'),
+
+        // Se connecter à un port spécifique
+        connectToPort: (portPath, config) => ipcRenderer.invoke('serial:connectToPort', portPath, config),
+
+        // Configurer un port sans s'y connecter
+        configure: (config) => ipcRenderer.invoke('serial:configure', config)
+    },
+
+    // API legacy pour compatibilité
+    socket: {
         // Envoyer un message au backend
         sendMessageToBackend: (message) => ipcRenderer.invoke('send-message-to-backend', message),
     }

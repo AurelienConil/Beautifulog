@@ -8,36 +8,32 @@
     <v-card-text>
       <div class="mb-4">
         <v-chip
-          :color="socketStore.isServerRunning ? 'success' : 'error'"
+          :color="getServerStatusColor()"
           variant="elevated"
           class="mr-2"
         >
           <v-icon
-            :icon="
-              socketStore.isServerRunning
-                ? 'mdi-check-circle'
-                : 'mdi-close-circle'
-            "
+            :icon="getServerStatusIcon()"
             class="mr-1"
           ></v-icon>
-          {{ socketStore.isServerRunning ? "En ligne" : "Hors ligne" }}
+          {{ getServerStatusText() }}
         </v-chip>
 
         <v-chip
-          v-if="socketStore.isServerRunning"
+          v-if="getSocketInput()?.config?.port"
           color="info"
           variant="outlined"
         >
-          Port: {{ socketStore.serverStatus.port }}
+          Port: {{ getSocketInput()?.config?.port }}
         </v-chip>
 
         <v-chip
-          v-if="socketStore.isServerRunning"
+          v-if="getSocketInput()?.status === 'connected'"
           color="primary"
           variant="outlined"
           class="ml-2"
         >
-          Clients: {{ socketStore.serverStatus.connectedClients }}
+          Clients: {{ getSocketInput()?.connectedClients || 0 }}
         </v-chip>
       </div>
 
@@ -190,7 +186,7 @@
             <v-btn
               @click="sendBroadcast"
               :disabled="
-                !broadcastMessage.trim() || !socketStore.isServerRunning
+                !broadcastMessage.trim() || getSocketInput()?.status !== 'connected'
               "
               color="primary"
               block
@@ -270,6 +266,80 @@ const getMessageTypeColor = (type) => {
     default:
       return "info";
   }
+};
+
+const getServerStatusText = () => {
+  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
+  
+  if (!socketInput) {
+    return "Serveur non configuré";
+  }
+  
+  const { status, config, connectedClients } = socketInput;
+  const port = config?.port || 0;
+  
+  switch (status) {
+    case 'connected':
+      if (connectedClients > 0) {
+        return `En ligne - ${connectedClients} client${connectedClients > 1 ? 's' : ''} connecté${connectedClients > 1 ? 's' : ''}`;
+      } else {
+        return `Serveur en marche, en attente de connexion sur le port ${port}`;
+      }
+    case 'connecting':
+      return `Démarrage du serveur sur le port ${port}...`;
+    case 'disconnected':
+      return "Serveur arrêté";
+    case 'error':
+      return "Erreur serveur";
+    default:
+      return "État inconnu";
+  }
+};
+
+const getServerStatusColor = () => {
+  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
+  
+  if (!socketInput) {
+    return "grey";
+  }
+  
+  switch (socketInput.status) {
+    case 'connected':
+      return socketInput.connectedClients > 0 ? 'success' : 'warning';
+    case 'connecting':
+      return 'info';
+    case 'disconnected':
+      return 'grey';
+    case 'error':
+      return 'error';
+    default:
+      return 'grey';
+  }
+};
+
+const getServerStatusIcon = () => {
+  const socketInput = socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
+  
+  if (!socketInput) {
+    return "mdi-help-circle";
+  }
+  
+  switch (socketInput.status) {
+    case 'connected':
+      return socketInput.connectedClients > 0 ? 'mdi-check-circle' : 'mdi-clock-outline';
+    case 'connecting':
+      return 'mdi-loading mdi-spin';
+    case 'disconnected':
+      return 'mdi-close-circle';
+    case 'error':
+      return 'mdi-alert-circle';
+    default:
+      return 'mdi-help-circle';
+  }
+};
+
+const getSocketInput = () => {
+  return socketStore.inputsStatus.find(input => input.name === 'Socket.IO');
 };
 
 const formatTime = (timestamp) => {
