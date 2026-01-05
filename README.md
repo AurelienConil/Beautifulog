@@ -192,7 +192,7 @@ const socketPort = 3001; // Changez ici
 ```javascript
 const socketServer = new Server(server, {
     cors: {
-        origin: ["http://localhost:3000", "https://monapp.com"], // Origines autorisées
+        origin: ["http://localhost:5174", "https://monapp.com"], // Origines autorisées
         methods: ["GET", "POST"]
     }
 });

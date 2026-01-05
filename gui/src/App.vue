@@ -3,7 +3,7 @@
     <v-app-bar app color="primary" dark density="compact">
       <v-app-bar-title>
         <v-icon left>mdi-file-document-outline</v-icon>
-        BeautifuLoggg
+        BeautifuLog
       </v-app-bar-title>
 
       <v-spacer></v-spacer>

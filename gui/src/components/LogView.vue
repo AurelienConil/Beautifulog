@@ -57,29 +57,93 @@
     <v-card-subtitle v-if="hasVarsToShow" class="pinned-vars-panel pa-2">
       <div class="d-flex flex-wrap align-center mb-2">
         <span class="text-caption text-grey mr-2">Variables épinglées:</span>
-        <v-chip
-          v-for="(varInfo, varName) in pinnedVariables"
-          :key="varName"
-          class="ma-1"
-          closable
-          variant="outlined"
-          :color="primary"
-          @click:close="unpinVariable(varName)"
-        >
-          <template v-slot:prepend>
-            <v-icon size="x-small">mdi-pin</v-icon>
-          </template>
-          <span class="font-weight-medium">{{ varName }}=</span>
-          <span class="ml-1">{{ varInfo.value }}</span>
-          <template v-if="varInfo.updates > 0" v-slot:append> </template>
-          <v-tooltip activator="parent" location="bottom">
-            Dernière mise à jour: {{ formatTimestamp(varInfo.timestamp) }}
-            <br />
-            Nombre de mises à jour: {{ varInfo.updates }}
-          </v-tooltip>
-        </v-chip>
+        <template v-for="(varInfo, varName) in normalVariables" :key="varName">
+          <v-menu
+            v-model="contextMenus[varName]"
+            :close-on-content-click="false"
+            location="bottom"
+            offset="8"
+          >
+            <template v-slot:activator="{ props: menuProps }">
+              <v-chip
+                v-bind="menuProps"
+                class="ma-1"
+                variant="outlined"
+                color="primary"
+              >
+                <template v-slot:prepend>
+                  <v-icon size="x-small">mdi-pin</v-icon>
+                </template>
+                <span class="font-weight-medium">{{ varName }}=</span>
+                <span class="ml-1">{{ varInfo.value }}</span>
+                <v-tooltip activator="parent" location="bottom">
+                  Dernière mise à jour: {{ formatTimestamp(varInfo.timestamp) }}
+                  <br />
+                  Nombre de mises à jour: {{ varInfo.updates }}
+                </v-tooltip>
+              </v-chip>
+            </template>
+
+            <v-card min-width="200">
+              <v-list density="compact">
+                <v-list-item
+                  prepend-icon="mdi-pin-off"
+                  title="Désépingler"
+                  @click="
+                    unpinVariable(varName);
+                    closeContextMenu(varName);
+                  "
+                ></v-list-item>
+                <v-list-item
+                  prepend-icon="mdi-tune"
+                  title="Mode Slider"
+                  @click="
+                    setVariableMode(varName, 'slider');
+                    closeContextMenu(varName);
+                  "
+                ></v-list-item>
+                <v-list-item
+                  prepend-icon="mdi-chart-line"
+                  title="Mode Graphique"
+                  @click="
+                    setVariableMode(varName, 'graph');
+                    closeContextMenu(varName);
+                  "
+                ></v-list-item>
+              </v-list>
+            </v-card>
+          </v-menu>
+        </template>
       </div>
     </v-card-subtitle>
+
+    <!-- Section des sliders -->
+    <div v-if="Object.keys(sliderVariables).length > 0" class="pa-2">
+      <PinSlider
+        v-for="(varInfo, varName) in sliderVariables"
+        :key="`slider-${varName}`"
+        :variable-name="varName"
+        :value="varInfo.value"
+        :timestamp="varInfo.timestamp"
+        :updates="varInfo.updates"
+        :history="varInfo.history || []"
+        @close="setVariableMode(varName, 'normal')"
+      />
+    </div>
+
+    <!-- Section des graphiques -->
+    <div v-if="Object.keys(graphVariables).length > 0" class="pa-2">
+      <PinGraph
+        v-for="(varInfo, varName) in graphVariables"
+        :key="`graph-${varName}`"
+        :variable-name="varName"
+        :value="varInfo.value"
+        :timestamp="varInfo.timestamp"
+        :updates="varInfo.updates"
+        :history="varInfo.history || []"
+        @close="setVariableMode(varName, 'normal')"
+      />
+    </div>
 
     <v-card-text class="pa-2 log-content-area" ref="messagesContainer">
       <div v-if="filteredMessages.length === 0" class="text-center text-grey">
@@ -183,6 +247,8 @@
 import { ref, computed, watch, watchEffect } from "vue";
 import { useSocketStore } from "../stores/socket.js";
 import JsonViewer from "./JsonViewer.vue";
+import PinSlider from "./PinSlider.vue";
+import PinGraph from "./PinGraph.vue";
 import { onMounted, onUnmounted, nextTick } from "vue";
 
 const props = defineProps({
@@ -253,12 +319,32 @@ const isPinned = (varName) => {
 
 // Épingler une variable
 const pinVariable = (varName, value, timestamp) => {
+  // Construire l'historique initial en cherchant toutes les valeurs précédentes de cette variable
+  const initialHistory = [];
+  socketStore.messages
+    .filter(
+      (message) =>
+        message.label === props.label &&
+        message.format === "variable" &&
+        message.variables &&
+        message.variables[varName] !== undefined
+    )
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) // Trier chronologiquement
+    .forEach((message) => {
+      const val = parseFloat(message.variables[varName]);
+      if (!isNaN(val)) {
+        initialHistory.push(val);
+      }
+    });
+
   // Lors de l'épinglage initial, on considère qu'il n'y a pas encore de "mise à jour".
   pinnedVariables.value[varName] = {
     value,
     timestamp,
     messageId: Date.now(), // Pour garantir l'unicité
     updates: 0, // Compteur de mises à jour (0 = pas d'update reçue après épinglage)
+    mode: "normal", // Mode d'affichage: 'normal', 'slider', 'graph'
+    history: initialHistory.slice(-50), // Garder les 50 dernières valeurs pour commencer
   };
 };
 
@@ -269,10 +355,22 @@ const updatePinnedVariable = (varName, value, timestamp) => {
   const currentVar = pinnedVariables.value[varName];
   // Incrémenter le compteur uniquement si la valeur a réellement changé
   const hasChanged = String(currentVar.value) !== String(value);
+
+  // Ajouter la valeur précédente à l'historique si elle a changé
+  const newHistory = [...(currentVar.history || [])];
+  if (hasChanged) {
+    newHistory.push(currentVar.value);
+    // Garder seulement les 100 dernières valeurs
+    if (newHistory.length > 100) {
+      newHistory.splice(0, newHistory.length - 100);
+    }
+  }
+
   pinnedVariables.value[varName] = {
     ...currentVar,
     value,
     timestamp,
+    history: newHistory,
     updates: hasChanged
       ? (currentVar.updates || 0) + 1
       : currentVar.updates || 0,
@@ -283,6 +381,25 @@ const updatePinnedVariable = (varName, value, timestamp) => {
 const unpinVariable = (varName) => {
   delete pinnedVariables.value[varName];
 };
+
+// Changer le mode d'affichage d'une variable
+const setVariableMode = (varName, mode) => {
+  if (!isPinned(varName)) return;
+  pinnedVariables.value[varName].mode = mode;
+};
+
+// Obtenir les variables par mode
+const getVariablesByMode = (mode) => {
+  return Object.fromEntries(
+    Object.entries(pinnedVariables.value).filter(
+      ([, varInfo]) => varInfo.mode === mode
+    )
+  );
+};
+
+const normalVariables = computed(() => getVariablesByMode("normal"));
+const sliderVariables = computed(() => getVariablesByMode("slider"));
+const graphVariables = computed(() => getVariablesByMode("graph"));
 
 // Y a-t-il des variables à afficher ?
 const hasVarsToShow = computed(() => {
@@ -415,7 +532,7 @@ watch(
       //wait for 10ms
       setTimeout(() => {
         scrollContainer.value.scrollToIndex(filteredMessagesCount.value);
-        console.log("scoll done");
+        console.log("scroll done");
       }, 20);
 
       //scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
@@ -574,6 +691,15 @@ const hoveredMessage = ref(null);
 const modalJsonOpen = ref(false);
 const modalJsonModel = ref(null);
 
+// État pour le menu contextuel des variables
+const contextMenus = ref({});
+const contextMenuVariable = ref(null);
+
+// Fermer le menu contextuel d'une variable
+const closeContextMenu = (varName) => {
+  contextMenus.value[varName] = false;
+};
+
 // Fonction pour ouvrir le modal avec les données JSON
 const openJsonModal = (jsonData) => {
   modalJsonModel.value = jsonData;
@@ -588,6 +714,7 @@ const openJsonModal = (jsonData) => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .log-view {

@@ -186,7 +186,7 @@ class SocketInput extends LogInput {
             return;
         }
 
-        console.log(`Message reçu via Socket.IO (${socket.id}):`, data);
+        //console.log(`Message reçu via Socket.IO (${socket.id}):`, data);
 
         // Mettre à jour les métadonnées du socket
         if (this.connectedSockets.has(socket.id)) {
