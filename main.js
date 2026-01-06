@@ -3,10 +3,14 @@ const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 const { formatMessage } = require('./formatMessage');
 const InputManager = require('./inputs/InputManager');
+const MessageBatcher = require('./MessageBatcher');
+const PerformanceProfiler = require('./PerformanceProfiler');
 
 // Configuration globale
 let mainWindow;
 let inputManager;
+let messageBatcher;
+let performanceProfiler;
 
 function createWindow() {
     // Créer la fenêtre du navigateur
@@ -50,6 +54,26 @@ function createWindow() {
 // Initialiser tous les inputs
 async function initializeInputs() {
     inputManager = new InputManager();
+
+    // Initialiser le message batcher avec des paramètres ultra-performants
+    messageBatcher = new MessageBatcher({
+        batchInterval: 50,        // 20fps au lieu de 30fps pour plus de batching
+        maxBatchSize: 100,        // Batches plus gros
+        guiUpdateInterval: 10000  // 10 secondes max au lieu de 30
+    });
+
+    // Initialiser le profiler de performance
+    performanceProfiler = new PerformanceProfiler();
+    performanceProfiler.startMonitoring(2000); // Log toutes les 2 secondes
+
+    // Configurer le callback pour envoyer les batches
+    messageBatcher.setBatchCallback((batch) => {
+        performanceProfiler.recordEvent('batchSent', { size: batch.batchSize });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            performanceProfiler.recordEvent('ipcSent');
+            mainWindow.webContents.send('input-message-batch', batch);
+        }
+    });
 
     // Configuration des inputs
     const config = {
@@ -100,9 +124,19 @@ function handleInputMessage(data) {
         return;
     }
 
+    // Profiling: message socket reçu
+    if (performanceProfiler) {
+        performanceProfiler.recordEvent('socketMessage');
+    }
+
     const formattedMessages = formatMessage(data.rawMessage);
 
     formattedMessages.forEach(formattedMessage => {
+        // Profiling: message formaté
+        if (performanceProfiler) {
+            performanceProfiler.recordEvent('messageFormatted');
+        }
+
         // Ajouter les métadonnées de l'input
         formattedMessage.inputSource = data.source;
         formattedMessage.inputType = data.type;
@@ -119,9 +153,21 @@ function handleInputMessage(data) {
             formattedMessage.clientCount = data.clientCount;
         }
 
-        // Transmettre le message au frontend via IPC
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('input-message-received', formattedMessage);
+        // Ajouter au batcher au lieu d'envoyer directement
+        if (messageBatcher) {
+            messageBatcher.addMessage(formattedMessage);
+
+            // Profiling: taille de la queue
+            if (performanceProfiler) {
+                performanceProfiler.recordEvent('queueSize', {
+                    size: messageBatcher.getCurrentQueueSize()
+                });
+            }
+        } else {
+            // Fallback si le batcher n'est pas initialisé
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('input-message-received', formattedMessage);
+            }
         }
     });
 }
@@ -169,6 +215,69 @@ function setupIpcHandlers() {
             }
         }
         return [];
+    });
+
+    // Handler pour obtenir les métriques de performance du batcher
+    ipcMain.handle('inputs:getMetrics', () => {
+        if (messageBatcher) {
+            return messageBatcher.getPerformanceMetrics();
+        }
+        return {
+            messagesPerSecond: 0,
+            batchesPerSecond: 0,
+            avgBatchSize: 0,
+            currentQueueSize: 0,
+            isThrottling: false,
+            uptimeMs: 0
+        };
+    });
+
+    // Handler pour configurer le throttling à chaud
+    ipcMain.handle('inputs:configureThrottling', (event, config) => {
+        if (messageBatcher) {
+            messageBatcher.configure(config);
+            return { success: true, config };
+        }
+        return { success: false, error: 'MessageBatcher non initialisé' };
+    });
+
+    // Handler pour forcer l'envoi d'un batch
+    ipcMain.handle('inputs:forceBatch', () => {
+        if (messageBatcher) {
+            messageBatcher.forceBatch();
+            return { success: true };
+        }
+        return { success: false };
+    });
+
+    // Handler pour obtenir les métriques du profiler de performance
+    ipcMain.handle('performance:getMetrics', () => {
+        if (performanceProfiler) {
+            return performanceProfiler.getMetrics();
+        }
+        return null;
+    });
+
+    // Handler pour contrôler le monitoring
+    ipcMain.handle('performance:toggleMonitoring', (event, enable) => {
+        if (performanceProfiler) {
+            if (enable) {
+                performanceProfiler.startMonitoring(1000);
+            } else {
+                performanceProfiler.stopMonitoring();
+            }
+            return { success: true, monitoring: enable };
+        }
+        return { success: false };
+    });
+
+    // Handler pour reset les métriques
+    ipcMain.handle('performance:resetMetrics', () => {
+        if (performanceProfiler) {
+            performanceProfiler.reset();
+            return { success: true };
+        }
+        return { success: false };
     });
 
     // Handler pour lister les ports série disponibles

@@ -1,11 +1,17 @@
 <template>
   <v-container fluid class="dynamic-table pa-2 my-0" style="height: 100%">
-    <v-row class="my-0 py-0 ">
+    <v-row class="my-0 py-0">
       <v-col cols="12" class="py-0">
         <v-card class="py-0">
-          <v-card-title class="d-flex inline-flex justify-space-between align-center title-bar">
+          <v-card-title
+            class="d-flex inline-flex justify-space-between align-center title-bar"
+          >
             <b>Vue des Logs par Process</b>
-            {{ socketStore.maxTimestampValue.toFixed(0) - socketStore.timeStampAtStop.toFixed(0) }} ms
+            {{
+              socketStore.maxTimestampValue.toFixed(0) -
+              socketStore.timeStampAtStop.toFixed(0)
+            }}
+            ms
             <v-slider
               v-if="!socketStore.IPCActivated"
               v-model="socketStore.maxTimestampValue"
@@ -51,7 +57,7 @@
       </v-col>
     </v-row>
 
-    <v-row v-if="uniqueLabels.length === 0" class="mt-0 py-0 ">
+    <v-row v-if="uniqueLabels.length === 0" class="mt-0 py-0">
       <v-col cols="12" class="pt-2">
         <v-card class="text-center pa-4">
           <v-icon size="64" color="grey-lighten-1" class="mb-4">
@@ -165,12 +171,12 @@ const hiddenLabels = ref([]);
 
 // Suivre les nouveaux messages pour capturer les nouveaux labels dans leur ordre d'apparition
 watch(
-  () => socketStore.messages.length,
+  () => socketStore.recentMessages.length,
   () => {
     // Vérifier s'il y a des nouveaux messages
-    if (socketStore.messages.length > 0) {
-      // Prendre le dernier message ajouté (le premier dans le tableau, car ils sont ajoutés en début de liste)
-      const latestMessage = socketStore.messages[0];
+    if (socketStore.recentMessages.length > 0) {
+      // Prendre le dernier message ajouté (le plus récent)
+      const latestMessage = socketStore.latestMessage;
       if (latestMessage && latestMessage.label) {
         // Si le label n'est pas encore dans l'ordre, l'ajouter
         if (!labelOrder.value.includes(latestMessage.label)) {
@@ -184,13 +190,8 @@ watch(
 
 // Labels uniques extraits des messages, en préservant l'ordre d'apparition et en excluant les labels masqués
 const uniqueLabels = computed(() => {
-  // Récupérer tous les labels des messages
-  const currentLabels = new Set();
-  socketStore.messages.forEach((message) => {
-    if (message.label) {
-      currentLabels.add(message.label);
-    }
-  });
+  // Récupérer tous les labels disponibles dans le store
+  const currentLabels = new Set(socketStore.getAvailableLabels);
 
   // Filtrer labelOrder pour ne garder que les labels qui existent encore
   // et ajouter les nouveaux labels qui pourraient ne pas être dans labelOrder
@@ -209,8 +210,9 @@ const uniqueLabels = computed(() => {
 
 // Nombre d'erreurs total
 const errorCount = computed(() => {
-  return socketStore.messages.filter((msg) => msg.type === "error-message")
-    .length;
+  return socketStore.recentMessages.filter(
+    (msg) => msg.type === "error-message"
+  ).length;
 });
 
 // Calcul dynamique de la taille des colonnes
@@ -243,12 +245,7 @@ const hideLabel = (label) => {
 // Fonction pour vérifier si un label est dans les messages actuels mais masqué
 const getHiddenLabelsInMessages = computed(() => {
   // Récupérer tous les labels des messages actuels
-  const currentLabels = new Set();
-  socketStore.messages.forEach((message) => {
-    if (message.label) {
-      currentLabels.add(message.label);
-    }
-  });
+  const currentLabels = new Set(socketStore.getAvailableLabels);
 
   // Retourner les labels qui sont à la fois dans les messages et dans hiddenLabels
   return hiddenLabels.value.filter((label) => currentLabels.has(label));
@@ -263,13 +260,10 @@ onMounted(() => {
 
   // Initialiser labelOrder avec les labels existants lors du montage
   // pour préserver l'ordre actuel et ne pas tout réorganiser
-  const existingLabels = new Set();
-  socketStore.messages.forEach((message) => {
-    if (message.label && !existingLabels.has(message.label)) {
-      existingLabels.add(message.label);
-      if (!labelOrder.value.includes(message.label)) {
-        labelOrder.value.push(message.label);
-      }
+  const existingLabels = socketStore.getAvailableLabels;
+  existingLabels.forEach((label) => {
+    if (!labelOrder.value.includes(label)) {
+      labelOrder.value.push(label);
     }
   });
 
@@ -288,10 +282,9 @@ onUnmounted(() => {
 <style scoped>
 .title-bar {
   font-size: medium;
-  margin : 1px;
+  margin: 1px;
   padding: 5px;
 }
-
 
 .dynamic-table {
   margin-top: 0px;

@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.on('input-message-received', (event, data) => callback(data));
         },
 
+        // Écouter les batches de messages (NOUVEAU)
+        onMessageBatch: (callback) => {
+            ipcRenderer.on('input-message-batch', (event, batch) => callback(batch));
+        },
+
         // Écouter les changements de statut des inputs
         onStatusChanged: (callback) => {
             ipcRenderer.on('input-status-changed', (event, data) => callback(data));
@@ -43,6 +48,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         onClientChanged: (callback) => {
             ipcRenderer.on('input-client-changed', (event, data) => callback(data));
         },
+
+        // Obtenir les métriques de performance (NOUVEAU)
+        getMetrics: () => ipcRenderer.invoke('inputs:getMetrics'),
+
+        // Configurer le throttling à chaud (NOUVEAU)
+        configureThrottling: (config) => ipcRenderer.invoke('inputs:configureThrottling', config),
+
+        // Forcer l'envoi d'un batch (NOUVEAU)
+        forceBatch: () => ipcRenderer.invoke('inputs:forceBatch'),
 
         // Retirer les écouteurs
         removeAllListeners: (channel) => {
@@ -66,6 +80,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     socket: {
         // Envoyer un message au backend
         sendMessageToBackend: (message) => ipcRenderer.invoke('send-message-to-backend', message),
+    },
+
+    // API pour le monitoring des performances (NOUVEAU)
+    performance: {
+        // Obtenir les métriques de performance
+        getMetrics: () => ipcRenderer.invoke('performance:getMetrics'),
+
+        // Activer/désactiver le monitoring
+        toggleMonitoring: (enable) => ipcRenderer.invoke('performance:toggleMonitoring', enable),
+
+        // Remettre à zéro les métriques
+        resetMetrics: () => ipcRenderer.invoke('performance:resetMetrics')
     }
 });
 

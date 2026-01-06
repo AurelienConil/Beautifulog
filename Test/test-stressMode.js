@@ -13,7 +13,7 @@ socket.on('connect', () => {
 
     let messageCount = 0;
     const startTime = Date.now();
-    const processes = ['process1', 'process2', 'process3', 'process4', 'process5'];
+    const processes = ['process1', 'ess2', 'proc3', 'pros4', 'prs5'];
     let currentTemp = 20.0;
 
     // Envoi intensif : 16ms d'intervalle = ~62.5 messages/seconde

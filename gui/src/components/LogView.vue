@@ -158,6 +158,13 @@
       >
         <template v-slot:default="{ item: message }">
           <div
+            v-memo="[
+              message.id,
+              message.timestamp,
+              message.msg,
+              message.type,
+              isPinned,
+            ]"
             class="message-item message-content"
             :class="getMessageClass(message)"
             :title="message.msg"
@@ -272,6 +279,12 @@ const socketStore = useSocketStore();
 const messagesContainer = ref(null);
 const scrollContainer = ref(null);
 
+// Référence pour le timeout de scroll (debouncing)
+const scrollTimeoutRef = ref(null);
+
+// Variable simple d'ajustement du scroll (réglage développeur)
+const SCROLL_DELAY = 20; // ms - Ajuster selon besoins de performance
+
 // État pour le défilement automatique (toujours activé)
 const autoScroll = true; // Changé de ref(true) à une constante fixe
 
@@ -309,101 +322,77 @@ const messageTypes = [
 // Types de messages sélectionnés (tous par défaut)
 const selectedTypes = ref(messageTypes.map((type) => type.value));
 
-// État local pour les variables épinglées
+// État local pour les variables épinglées - DEPRECATED (maintenant dans le store)
 const pinnedVariables = ref({});
 
-// Vérifier si une variable est épinglée
+// Vérifier si une variable est épinglée (utilise le store)
 const isPinned = (varName) => {
-  return Object.keys(pinnedVariables.value).includes(varName);
+  return Object.keys(pinnedVariablesFromStore.value).includes(varName);
 };
 
-// Épingler une variable
+// Épingler une variable (utilise le store)
 const pinVariable = (varName, value, timestamp) => {
-  // Construire l'historique initial en cherchant toutes les valeurs précédentes de cette variable
-  const initialHistory = [];
-  socketStore.messages
-    .filter(
-      (message) =>
-        message.label === props.label &&
-        message.format === "variable" &&
-        message.variables &&
-        message.variables[varName] !== undefined
-    )
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) // Trier chronologiquement
-    .forEach((message) => {
-      const val = parseFloat(message.variables[varName]);
-      if (!isNaN(val)) {
-        initialHistory.push(val);
-      }
-    });
-
-  // Lors de l'épinglage initial, on considère qu'il n'y a pas encore de "mise à jour".
-  pinnedVariables.value[varName] = {
-    value,
-    timestamp,
-    messageId: Date.now(), // Pour garantir l'unicité
-    updates: 0, // Compteur de mises à jour (0 = pas d'update reçue après épinglage)
-    mode: "normal", // Mode d'affichage: 'normal', 'slider', 'graph'
-    history: initialHistory.slice(-50), // Garder les 50 dernières valeurs pour commencer
-  };
+  socketStore.pinVariable(props.label, varName, value, timestamp);
 };
 
-// Mettre à jour une variable épinglée
+// Mettre à jour une variable épinglée - DEPRECATED (maintenant géré dans le store)
 const updatePinnedVariable = (varName, value, timestamp) => {
-  if (!isPinned(varName)) return;
-
-  const currentVar = pinnedVariables.value[varName];
-  // Incrémenter le compteur uniquement si la valeur a réellement changé
-  const hasChanged = String(currentVar.value) !== String(value);
-
-  // Ajouter la valeur précédente à l'historique si elle a changé
-  const newHistory = [...(currentVar.history || [])];
-  if (hasChanged) {
-    newHistory.push(currentVar.value);
-    // Garder seulement les 100 dernières valeurs
-    if (newHistory.length > 100) {
-      newHistory.splice(0, newHistory.length - 100);
-    }
-  }
-
-  pinnedVariables.value[varName] = {
-    ...currentVar,
-    value,
-    timestamp,
-    history: newHistory,
-    updates: hasChanged
-      ? (currentVar.updates || 0) + 1
-      : currentVar.updates || 0,
-  };
+  // Cette fonction n'est plus utilisée car les mises à jour sont faites automatiquement dans le store
+  console.log(
+    "updatePinnedVariable est obsolète, les mises à jour sont gérées dans le store"
+  );
 };
 
-// Désépingler une variable
+// Désépingler une variable (utilise le store)
 const unpinVariable = (varName) => {
-  delete pinnedVariables.value[varName];
+  socketStore.unpinVariable(props.label, varName);
 };
 
-// Changer le mode d'affichage d'une variable
+// Changer le mode d'affichage d'une variable (utilise le store)
 const setVariableMode = (varName, mode) => {
-  if (!isPinned(varName)) return;
-  pinnedVariables.value[varName].mode = mode;
+  socketStore.setPinnedVariableMode(props.label, varName, mode);
 };
 
-// Obtenir les variables par mode
+// Obtenir les variables par mode (utilise le store)
 const getVariablesByMode = (mode) => {
   return Object.fromEntries(
-    Object.entries(pinnedVariables.value).filter(
+    Object.entries(pinnedVariablesFromStore.value).filter(
       ([, varInfo]) => varInfo.mode === mode
     )
   );
 };
 
-const normalVariables = computed(() => getVariablesByMode("normal"));
-const sliderVariables = computed(() => getVariablesByMode("slider"));
-const graphVariables = computed(() => getVariablesByMode("graph"));
+// Computed properties simplifiés pour les variables (utilise le store)
+const normalVariables = computed(() => {
+  const vars = getVariablesByMode("normal");
+  const entries = Object.entries(vars);
+  if (entries.length > 10) {
+    return Object.fromEntries(entries.slice(0, 10));
+  }
+  return vars;
+});
 
-// Y a-t-il des variables à afficher ?
+const sliderVariables = computed(() => {
+  const vars = getVariablesByMode("slider");
+  const entries = Object.entries(vars);
+  if (entries.length > 5) {
+    return Object.fromEntries(entries.slice(0, 5));
+  }
+  return vars;
+});
+
+const graphVariables = computed(() => {
+  const vars = getVariablesByMode("graph");
+  const entries = Object.entries(vars);
+  if (entries.length > 3) {
+    return Object.fromEntries(entries.slice(0, 3));
+  }
+  return vars;
+});
+
+// Y a-t-il des variables à afficher ? (utilise le store)
 const hasVarsToShow = computed(() => {
-  return Object.keys(pinnedVariables.value).length > 0;
+  return Object.keys(pinnedVariablesFromStore.value).length > 0;
 });
 
 // Ajuster le style du card-text en fonction de la présence de variables épinglées et des filtres de type
@@ -422,85 +411,77 @@ const getCardTextStyle = () => {
   }
 };
 
-//Messages filtrés par label, type et contenu
-const filteredMessages = computed(() => {
-  // Filtrer les messages et les inverser pour que les plus récents apparaissent en bas
-  return socketStore.messages
-    .filter((message) => message.label === props.label)
-    .filter((message) => {
-      // Filtrer par type de message
-      return selectedTypes.value.includes(message.type || "log-message");
-    })
-    .filter((message) => {
-      // Si ce n'est pas un message de type variable, l'afficher normalement
-      if (message.format !== "variable") {
-        return true;
-      }
+//NOUVEAU : Réactivité ciblée - seulement ce label
+const labelMessages = socketStore.createLabelComputed(props.label);
 
-      // Pour les messages de type variable, vérifier si toutes ses variables sont épinglées
+// NOUVEAU : Variables pinnées depuis le store
+const pinnedVariablesFromStore = socketStore.createPinnedVariablesComputed(
+  props.label
+);
+
+//Messages filtrés (ULTRA-OPTIMISÉ - ne travaille QUE sur les messages de ce label)
+const filteredMessages = computed(() => {
+  const messages = labelMessages.value; // Déjà filtrés par label !
+
+  if (messages.length === 0) {
+    return [];
+  }
+
+  let filtered = messages;
+
+  // Filtrer par type (seulement si nécessaire)
+  if (selectedTypes.value.length < messageTypes.length) {
+    filtered = filtered.filter((message) =>
+      selectedTypes.value.includes(message.type || "log-message")
+    );
+  }
+
+  // Filtrer par variables épinglées (optimisé)
+  filtered = filtered.filter((message) => {
+    if (message.format === "variable" && message.variables) {
       const allVarsArePinned = Object.keys(message.variables).every((varName) =>
         isPinned(varName)
       );
-
-      // Si toutes les variables sont épinglées, ne pas afficher le message
       return !allVarsArePinned;
-    })
-    .filter((message) => {
-      // Si pas de filtre de contenu, afficher tous les messages
-      if (!contentFilter.value) return true;
+    }
+    return true;
+  });
 
-      // Recherche dans le contenu du message
-      const filter = contentFilter.value.toLowerCase();
-
-      // Pour les messages de format variable, vérifier dans le message et les variables
-      if (message.format === "variable") {
-        // Vérifier dans le message
-        if (
-          typeof message.msg === "string" &&
-          message.msg.toLowerCase().includes(filter)
-        ) {
-          return true;
-        }
-
-        // Vérifier dans les variables
-        if (message.variables) {
-          for (const [varName, value] of Object.entries(message.variables)) {
-            if (
-              varName.toLowerCase().includes(filter) ||
-              String(value).toLowerCase().includes(filter)
-            ) {
-              return true;
-            }
-          }
-        }
-        return false;
-      }
-
-      // Pour les messages JSON
-      if (message.format === "json" || isJsonData(message.msg)) {
-        const jsonString = JSON.stringify(
-          message.jsonData || message.msg
-        ).toLowerCase();
-        return jsonString.includes(filter);
-      }
-
-      // Pour les messages texte standards
-      return (
+  // Filtrer par contenu (seulement si actif)
+  if (contentFilter.value?.trim()) {
+    const filter = contentFilter.value.toLowerCase();
+    filtered = filtered.filter((message) => {
+      // Recherche rapide dans le message principal
+      if (
         typeof message.msg === "string" &&
         message.msg.toLowerCase().includes(filter)
-      );
-    })
-    .filter((message) => {
-      // Filtrer les messages en fonction du timestamp si la réception IPC est désactivée
-      if (!socketStore.IPCActivated) {
-        // socketStore.maxTimestampValue est le timestamp maximum à afficher, et calculé en fonctione de Date.now()
-        // Le timestamp du message est calculé avec timestamp: new Date().toISOString()
-        // il faut donc convertir les deux en millisecondes pour la comparaison
-        const messageTime = new Date(message.timestamp).getTime();
-        return messageTime <= socketStore.maxTimestampValue;
+      ) {
+        return true;
       }
-      return true;
+
+      // Variables (optimisé)
+      if (message.format === "variable" && message.variables) {
+        return Object.entries(message.variables).some(
+          ([varName, value]) =>
+            varName.toLowerCase().includes(filter) ||
+            String(value).toLowerCase().includes(filter)
+        );
+      }
+
+      return false;
     });
+  }
+
+  // Filtre temporel (seulement si IPC désactivé)
+  if (!socketStore.IPCActivated) {
+    filtered = filtered.filter((message) => {
+      const messageTime = new Date(message.timestamp).getTime();
+      return messageTime <= socketStore.maxTimestampValue;
+    });
+  }
+
+  // Retourner les 100 derniers messages max
+  return filtered.slice(-100);
 });
 
 // const filteredMessages = computed(() => {
@@ -513,13 +494,8 @@ const filteredMessagesCount = computed(() => {
   return filteredMessages.value.length;
 });
 
-watch(
-  () => filteredMessages.value,
-  () => {
-    // Mettre à jour les variables épinglées avec les dernières valeurs
-    updateAllPinnedVariables();
-  }
-);
+// SUPPRIMÉ : Le watch et updateAllPinnedVariables ne sont plus nécessaires
+// car les variables pinnées sont mises à jour automatiquement dans le store
 
 watch(
   () => filteredMessagesCount.value,
@@ -528,14 +504,19 @@ watch(
 
     // Pour v-virtual-scroll, utiliser la méthode scrollToIndex si disponible
     if (scrollContainer.value && filteredMessagesCount.value > 0) {
-      // On scroll sur le dernier index (le plus récent)
-      //wait for 10ms
-      setTimeout(() => {
-        scrollContainer.value.scrollToIndex(filteredMessagesCount.value);
-        console.log("scroll done");
-      }, 20);
+      // DEBOUNCING : Annuler le scroll précédent s'il existe
+      if (scrollTimeoutRef.value) {
+        clearTimeout(scrollTimeoutRef.value);
+        scrollTimeoutRef.value = null;
+      }
 
-      //scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+      // Créer un nouveau timeout
+      scrollTimeoutRef.value = setTimeout(() => {
+        if (scrollContainer.value) {
+          scrollContainer.value.scrollToIndex(filteredMessagesCount.value);
+        }
+        scrollTimeoutRef.value = null; // Reset de la référence
+      }, SCROLL_DELAY);
     }
   }
 );
@@ -543,45 +524,8 @@ watch(
 // Variable pour mémoriser le dernier timestamp
 const lastMessageTimestamp = ref(0);
 
-// Fonction pour mettre à jour toutes les variables épinglées avec les valeurs les plus récentes
-const updateAllPinnedVariables = () => {
-  // On doit collecter les dernières valeurs des variables épinglées
-  const latestValues = {};
-
-  // Parcourir tous les messages de ce label (non filtrés)
-  // Note: socketStore.messages est déjà trié avec les plus récents en premier
-  socketStore.messages
-    .filter(
-      (message) =>
-        message.label === props.label && message.format === "variable"
-    )
-    .forEach((message) => {
-      if (message.variables) {
-        Object.entries(message.variables).forEach(([varName, value]) => {
-          // Si la variable est épinglée, on prend toujours la valeur la plus récente
-          if (isPinned(varName)) {
-            // Si latestValues[varName] n'existe pas ou si ce message est plus récent
-            if (
-              !latestValues[varName] ||
-              message.timestamp > latestValues[varName].timestamp
-            ) {
-              latestValues[varName] = {
-                value,
-                timestamp: message.timestamp,
-              };
-            }
-          }
-        });
-      }
-    });
-
-  // Mettre à jour les variables épinglées avec les valeurs les plus récentes
-  Object.entries(latestValues).forEach(([varName, data]) => {
-    updatePinnedVariable(varName, data.value, data.timestamp);
-  });
-};
-
-// Appeler la fonction de mise à jour après chaque recalcul des messages filtrés
+// SUPPRIMÉ : updateAllPinnedVariables n'est plus nécessaire
+// Les variables sont mises à jour automatiquement dans le store lors de la réception des messages
 
 // Couleur du statut basée sur les types de messages
 const getStatusColor = () => {
@@ -705,6 +649,14 @@ const openJsonModal = (jsonData) => {
   modalJsonModel.value = jsonData;
   modalJsonOpen.value = true;
 };
+
+// Nettoyage lors de la destruction du composant
+onUnmounted(() => {
+  if (scrollTimeoutRef.value) {
+    clearTimeout(scrollTimeoutRef.value);
+    scrollTimeoutRef.value = null;
+  }
+});
 </script>
 
 <style scoped>

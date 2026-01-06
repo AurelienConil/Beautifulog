@@ -111,7 +111,9 @@ const refreshStore = async () => {
 const logStoreState = () => {
   console.log("=== État du Store Socket.IO ===");
   console.log("Serveur:", socketStore.serverStatus);
-  console.log("Messages:", socketStore.messages);
+  console.log("Messages par label:", socketStore.messagesByLabel);
+  console.log("Labels disponibles:", socketStore.getAvailableLabels);
+  console.log("Nombre total de messages:", socketStore.getTotalMessageCount);
   console.log("Historique des connexions:", socketStore.connectionHistory);
   console.log("Statistiques:", socketStore.getStatistics);
 };

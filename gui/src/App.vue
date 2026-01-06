@@ -59,6 +59,18 @@
         </v-icon>
       </v-btn>
 
+      <!-- Performance Monitor Button -->
+      <v-btn
+        icon
+        @click="showPerformanceModal = !showPerformanceModal"
+        class="mr-2"
+        v-tooltip="'Performance Monitor'"
+      >
+        <v-icon :color="showPerformanceModal ? 'primary' : 'default'">
+          mdi-speedometer
+        </v-icon>
+      </v-btn>
+
       <v-btn
         icon
         @click="toggleCompactMode"
@@ -85,6 +97,21 @@
 
     <!-- Composant DebugHelp -->
     <DebugHelp :visible="helpModal" @close="helpModal = false" />
+
+    <!-- Modal Performance Monitor -->
+    <v-dialog v-model="showPerformanceModal" max-width="1000px" persistent>
+      <v-card>
+        <v-card-title class="d-flex justify-space-between align-center">
+          <span>Performance Monitor</span>
+          <v-btn icon @click="showPerformanceModal = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <PerformanceMonitor />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <!-- Modal WelcomeCard -->
     <v-dialog v-model="welcomeModal" max-width="800px">
@@ -152,6 +179,7 @@ import InputManager from "./components/InputManager.vue";
 import StoreViewer from "./components/StoreViewer.vue";
 import DynamicTable from "./components/DynamicTable.vue";
 import DebugHelp from "./components/DebugHelp.vue";
+import PerformanceMonitor from "./components/PerformanceMonitor.vue";
 
 const theme = useTheme();
 const isDark = computed(() => theme.global.name.value === "dark");
@@ -165,6 +193,7 @@ const welcomeModal = ref(false);
 const storeModal = ref(false);
 const socketModal = ref(false);
 const helpModal = ref(false);
+const showPerformanceModal = ref(false);
 
 // Debug
 const debugMessage = ref("");

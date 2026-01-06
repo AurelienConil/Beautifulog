@@ -1,16 +1,22 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, shallowRef, triggerRef } from 'vue'
 
 export const useSocketStore = defineStore('socket', () => {
     // État pour les inputs
     const inputsStatus = ref([])
 
-    // État pour les messages (reste identique)
-    const messages = ref([])
-    const connectionHistory = ref([])
-    const debugMode = ref(true)
-
+    // État pour les messages (NOUVEAU SYSTÈME PAR LABEL)
+    const messagesByLabel = shallowRef(new Map())
+    const maxMessagesPerLabel = 100 // Limite stricte par label
     let messageIdCounter = 0
+
+    // NOUVEAU : Gestion des variables pinnées
+    const pinnedVariablesByLabel = shallowRef(new Map()) // Map<label, Set<varName>>
+    const pinnedVariableValues = shallowRef(new Map()) // Map<label_varName, {value, timestamp, history, updates, mode}>
+
+    // État pour les connexions
+    const connectionHistory = ref([])
+    const debugMode = ref(false)
 
     // État pour contrôler la réception des messages
     const isReceivingMessages = ref(true)
@@ -56,55 +62,66 @@ export const useSocketStore = defineStore('socket', () => {
         }
     })
 
-    const messageCount = computed(() => messages.value.length)
-    const latestMessage = computed(() => messages.value[0] || null)
+    // NOUVEAU : Getters optimisés pour labels spécifiques
+    const getMessagesForLabel = (label) => {
+        return messagesByLabel.value.get(label) || []
+    }
 
-    const messagesByType = computed(() => {
-        const grouped = {}
-        messages.value.forEach(message => {
-            if (!grouped[message.type]) {
-                grouped[message.type] = []
-            }
-            grouped[message.type].push(message)
+    // NOUVEAU : Créer un computed réactif pour un label spécifique
+    const createLabelComputed = (label) => {
+        return computed(() => {
+            // Réactivité ciblée - ne se déclenche que pour ce label
+            messagesByLabel.value // Déclenche la réactivité
+            return getMessagesForLabel(label)
         })
-        return grouped
+    }
+
+    // NOUVEAU : Obtenir tous les labels existants
+    const getAvailableLabels = computed(() => {
+        return Array.from(messagesByLabel.value.keys()).sort()
     })
 
-    const messagesByLabel = computed(() => {
-        const grouped = {}
-        messages.value.forEach(message => {
-            if (message.label) {
-                if (!grouped[message.label]) {
-                    grouped[message.label] = []
+    // NOUVEAU : Obtenir le nombre total de messages (tous labels)
+    const getTotalMessageCount = computed(() => {
+        let total = 0
+        messagesByLabel.value.forEach(messages => {
+            total += messages.length
+        })
+        return total
+    })
+
+    // Getters simplifiés (pour compatibilité)
+    const messageCount = computed(() => getTotalMessageCount.value)
+
+    const latestMessage = computed(() => {
+        let latest = null
+        let latestTime = 0
+
+        messagesByLabel.value.forEach(messages => {
+            if (messages.length > 0) {
+                const lastMsg = messages[messages.length - 1]
+                const msgTime = new Date(lastMsg.timestamp).getTime()
+                if (msgTime > latestTime) {
+                    latestTime = msgTime
+                    latest = lastMsg
                 }
-                grouped[message.label].push(message)
             }
         })
-        return grouped
+
+        return latest
     })
 
-    const uniqueLabels = computed(() => {
-        const labels = new Set()
-        messages.value.forEach(message => {
-            if (message.label) {
-                labels.add(message.label)
-            }
+    const recentMessages = computed(() => {
+        // Récupérer les 50 messages les plus récents de tous les labels
+        const allMessages = []
+        messagesByLabel.value.forEach(messages => {
+            allMessages.push(...messages)
         })
-        return Array.from(labels).sort()
+
+        return allMessages
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, 50)
     })
-
-    const errorMessages = computed(() =>
-        messages.value.filter(msg => msg.type === 'error-message')
-    )
-
-
-    const logMessages = computed(() =>
-        messages.value.filter(msg => msg.type === 'log-message')
-    )
-
-    const recentMessages = computed(() =>
-        messages.value.slice(0, 50)
-    )
 
     // Actions - adaptées pour la nouvelle architecture
     const updateInputsStatus = async () => {
@@ -127,30 +144,286 @@ export const useSocketStore = defineStore('socket', () => {
         return serverStatus.value
     }
 
-    const addMessages = (messageArray) => {
-        messageArray.forEach(messageData => {
-            addMessage(messageData)
-        })
-    }
+    // Traitement atomique des batches avec tri par label (ULTRA-OPTIMISÉ)
+    const addMessageBatch = (batch) => {
+        if (!IPCActivated.value) {
+            console.log('Batch ignoré car la réception est désactivée');
+            return;
+        }
 
-    const addMessage = (messageData) => {
-        const message = {
+        console.log(`📦 Traitement atomique de ${batch.batchSize} messages par label`);
+
+        // 1. Grouper les messages par label AVANT traitement
+        const messagesByLabelGroup = new Map()
+
+        batch.messages.forEach(messageData => {
+            const label = messageData.label || 'Unknown'
+            if (!messagesByLabelGroup.has(label)) {
+                messagesByLabelGroup.set(label, [])
+            }
+            messagesByLabelGroup.get(label).push(messageData)
+        })
+
+        // 2. Traiter chaque label séparément
+        const currentMap = messagesByLabel.value
+        let totalProcessed = 0
+
+        messagesByLabelGroup.forEach((messages, label) => {
+            let labelMessages = currentMap.get(label) || []
+            const pinnedVars = pinnedVariablesByLabel.value.get(label)
+
+            // Traiter tous les messages de ce label d'un coup
+            const processedMessages = []
+
+            messages.forEach(messageData => {
+                const processedMessage = {
+                    id: ++messageIdCounter,
+                    timestamp: messageData.timestamp || new Date().toISOString(),
+                    batchedAt: messageData.batchedAt,
+                    isThrottled: batch.isThrottling,
+                    processingTime: batch.processingTime,
+                    ...messageData
+                }
+
+                // Trier les messages variables selon pinnage
+                if (messageData.format === 'variable' && messageData.variables && pinnedVars) {
+                    let hasUnpinnedVars = false
+
+                    Object.entries(messageData.variables).forEach(([varName, value]) => {
+                        if (pinnedVars.has(varName)) {
+                            // Variable pinnée → mettre à jour directement
+                            updatePinnedVariableValue(label, varName, value, processedMessage.timestamp)
+                        } else {
+                            hasUnpinnedVars = true
+                        }
+                    })
+
+                    // Ajouter le message seulement s'il contient des variables non pinnées
+                    if (hasUnpinnedVars) {
+                        processedMessages.push(processedMessage)
+                    }
+                } else {
+                    // Message normal → toujours ajouter
+                    processedMessages.push(processedMessage)
+                }
+            })
+
+            // Ajout en bloc des messages non pinnés
+            labelMessages = [...labelMessages, ...processedMessages]
+
+            // Limitation stricte par label
+            if (labelMessages.length > maxMessagesPerLabel) {
+                labelMessages = labelMessages.slice(-maxMessagesPerLabel)
+            }
+
+            currentMap.set(label, labelMessages)
+            totalProcessed += processedMessages.length
+        })
+
+        // 3. UN SEUL triggerRef pour tous les labels modifiés
+        triggerRef(messagesByLabel)
+
+        // 4. Mise à jour du timestamp maximum
+        const latestTimestamp = Math.max(
+            ...batch.messages
+                .map(msg => msg.receivedAt)
+                .filter(t => t && !isNaN(t)),
+            maxTimestampValue.value
+        );
+
+        if (latestTimestamp > maxTimestampValue.value) {
+            setMaxTimestampValue(latestTimestamp);
+        }
+
+        console.log(`✅ Batch traité: ${messagesByLabelGroup.size} labels, ${totalProcessed} messages`);
+
+        // 5. Mettre à jour les métriques
+        updateBatchMetrics(batch);
+    };
+
+    // NOUVEAU : Ajouter un message à un label spécifique (réactivité ciblée)
+    const addMessageToLabel = (messageData) => {
+        const label = messageData.label || 'Unknown'
+        const currentMap = messagesByLabel.value
+
+        // Récupérer ou créer l'array pour ce label
+        let labelMessages = currentMap.get(label) || []
+
+        // Créer le nouveau message
+        const newMessage = {
             id: ++messageIdCounter,
             timestamp: messageData.timestamp || new Date().toISOString(),
             ...messageData
         }
 
-        //console.log('Ajout d\'un message au store:', message)
+        // Modification directe (non-réactive)
+        labelMessages = [...labelMessages, newMessage]
 
-        // Ajouter en début de liste (messages les plus récents en premier)
-        messages.value.push(message)
-
-        // Limiter le nombre de messages stockés (par exemple 1000)
-        if (messages.value.length > 1000) {
-            messages.value = messages.value.slice(0, 1000)
+        // Limiter par label (pas global)
+        if (labelMessages.length > maxMessagesPerLabel) {
+            labelMessages = labelMessages.slice(-maxMessagesPerLabel)
         }
 
-        return message
+        // Mettre à jour la Map
+        currentMap.set(label, labelMessages)
+
+        // Déclencher la réactivité UNE FOIS
+        triggerRef(messagesByLabel)
+
+        return newMessage
+    }
+
+    // Métriques de performance des batches (NOUVEAU)
+    const batchMetrics = ref({
+        batchesProcessed: 0,
+        messagesProcessed: 0,
+        lastBatchSize: 0,
+        averageBatchSize: 0,
+        throttleEvents: 0,
+        lastProcessingTime: 0
+    });
+
+    const updateBatchMetrics = (batch) => {
+        batchMetrics.value.batchesProcessed++;
+        batchMetrics.value.messagesProcessed += batch.batchSize;
+        batchMetrics.value.lastBatchSize = batch.batchSize;
+        batchMetrics.value.averageBatchSize = Math.round(
+            batchMetrics.value.messagesProcessed / batchMetrics.value.batchesProcessed
+        );
+        batchMetrics.value.lastProcessingTime = batch.processingTime || 0;
+        if (batch.isThrottling) {
+            batchMetrics.value.throttleEvents++;
+        }
+    };
+
+    const addMessages = (messageArray) => {
+        messageArray.forEach(messageData => {
+            addMessageToLabel(messageData)
+        })
+    }
+
+    const clearMessages = () => {
+        messagesByLabel.value.clear()
+        triggerRef(messagesByLabel)
+        console.log('Tous les messages effacés du store')
+    }
+
+    const clearMessagesForLabel = (label) => {
+        const currentMap = messagesByLabel.value
+        currentMap.delete(label)
+        triggerRef(messagesByLabel)
+        console.log(`Messages pour le label "${label}" effacés`)
+    }
+
+    // NOUVEAU : Gestion des variables pinnées
+    const pinVariable = (label, varName, value, timestamp) => {
+        // Ajouter à la liste des variables pinnées pour ce label
+        let pinnedVars = pinnedVariablesByLabel.value.get(label)
+        if (!pinnedVars) {
+            pinnedVars = new Set()
+            pinnedVariablesByLabel.value.set(label, pinnedVars)
+        }
+        pinnedVars.add(varName)
+
+        // Initialiser la valeur avec historique
+        const key = `${label}_${varName}`
+        pinnedVariableValues.value.set(key, {
+            value,
+            timestamp,
+            history: [],
+            updates: 0,
+            mode: 'normal'
+        })
+
+        triggerRef(pinnedVariablesByLabel)
+        triggerRef(pinnedVariableValues)
+
+        console.log(`Variable "${varName}" pinnée pour le label "${label}"`)
+    }
+
+    const unpinVariable = (label, varName) => {
+        // Retirer de la liste des variables pinnées
+        const pinnedVars = pinnedVariablesByLabel.value.get(label)
+        if (pinnedVars) {
+            pinnedVars.delete(varName)
+            if (pinnedVars.size === 0) {
+                pinnedVariablesByLabel.value.delete(label)
+            }
+        }
+
+        // Supprimer la valeur
+        const key = `${label}_${varName}`
+        pinnedVariableValues.value.delete(key)
+
+        triggerRef(pinnedVariablesByLabel)
+        triggerRef(pinnedVariableValues)
+
+        console.log(`Variable "${varName}" dépinnée pour le label "${label}"`)
+    }
+
+    const updatePinnedVariableValue = (label, varName, value, timestamp) => {
+        const key = `${label}_${varName}`
+        const currentVar = pinnedVariableValues.value.get(key)
+
+        if (!currentVar) return
+
+        const hasChanged = String(currentVar.value) !== String(value)
+        const newHistory = [...(currentVar.history || [])]
+
+        if (hasChanged) {
+            newHistory.push(currentVar.value)
+            if (newHistory.length > 100) {
+                newHistory.splice(0, newHistory.length - 100)
+            }
+        }
+
+        pinnedVariableValues.value.set(key, {
+            ...currentVar,
+            value,
+            timestamp,
+            history: newHistory,
+            updates: hasChanged ? (currentVar.updates || 0) + 1 : currentVar.updates || 0
+        })
+
+        triggerRef(pinnedVariableValues)
+    }
+
+    const setPinnedVariableMode = (label, varName, mode) => {
+        const key = `${label}_${varName}`
+        const currentVar = pinnedVariableValues.value.get(key)
+
+        if (currentVar) {
+            pinnedVariableValues.value.set(key, {
+                ...currentVar,
+                mode
+            })
+            triggerRef(pinnedVariableValues)
+        }
+    }
+
+    const getPinnedVariablesForLabel = (label) => {
+        const result = {}
+        const pinnedVars = pinnedVariablesByLabel.value.get(label)
+
+        if (pinnedVars) {
+            pinnedVars.forEach(varName => {
+                const key = `${label}_${varName}`
+                const varData = pinnedVariableValues.value.get(key)
+                if (varData) {
+                    result[varName] = varData
+                }
+            })
+        }
+
+        return result
+    }
+
+    const createPinnedVariablesComputed = (label) => {
+        return computed(() => {
+            // Forçer la réactivité sur les changements
+            pinnedVariableValues.value
+            return getPinnedVariablesForLabel(label)
+        })
     }
 
     const addConnectionEvent = (eventData) => {
@@ -174,11 +447,6 @@ export const useSocketStore = defineStore('socket', () => {
         updateServerStatus()
 
         return event
-    }
-
-    const clearMessages = () => {
-        messages.value = []
-        console.log('Messages effacés du store')
     }
 
     const clearConnectionHistory = () => {
@@ -224,10 +492,18 @@ export const useSocketStore = defineStore('socket', () => {
         if (window.electronAPI?.inputs) {
             console.log('Initialisation des écouteurs d\'inputs dans le store')
 
-            // Écouter les messages reçus de tous les inputs
+            // Écouter les BATCHES de messages (PRIORITÉ)
+            if (window.electronAPI.inputs.onMessageBatch) {
+                console.log('✅ Initialisation de l\'écouteur de batches')
+                window.electronAPI.inputs.onMessageBatch((batch) => {
+                    addMessageBatch(batch);
+                });
+            }
+
+            // Écouter les messages individuels (LEGACY - pour compatibilité)
             window.electronAPI.inputs.onMessageReceived((data) => {
                 if (IPCActivated.value) {
-                    addMessage(data)
+                    addMessageToLabel(data) // Utiliser la nouvelle méthode
                     if (data.receivedAt && data.receivedAt > maxTimestampValue.value) {
                         setMaxTimestampValue(data.receivedAt)
                     }
@@ -301,7 +577,7 @@ export const useSocketStore = defineStore('socket', () => {
 
                 // Ajouter les messages formatés retournés par le backend au store
                 if (Array.isArray(result)) {
-                    result.forEach((formattedMessage) => addMessage(formattedMessage));
+                    result.forEach((formattedMessage) => addMessageToLabel(formattedMessage));
                 }
 
                 return result;
@@ -316,9 +592,9 @@ export const useSocketStore = defineStore('socket', () => {
 
     // Statistiques
     const getStatistics = computed(() => ({
-        totalMessages: messages.value.length,
-        errorCount: errorMessages.value.length,
-        logCount: logMessages.value.length,
+        totalMessages: getTotalMessageCount.value,
+        errorCount: 0, // TODO: implement error counting with new architecture
+        logCount: getTotalMessageCount.value,
         connectedClients: serverStatus.value.connectedClients,
         isServerRunning: serverStatus.value.isRunning,
         serverPort: serverStatus.value.port,
@@ -330,7 +606,6 @@ export const useSocketStore = defineStore('socket', () => {
         // État
         inputsStatus,
         serverStatus,
-        messages,
         connectionHistory,
         debugMode,
         isReceivingMessages,
@@ -338,15 +613,18 @@ export const useSocketStore = defineStore('socket', () => {
         maxTimestampValue,
         timeStampAtStop,
 
+        // Architecture par labels
+        messagesByLabel,
+        createLabelComputed,
+        getMessagesForLabel,
+        getAvailableLabels,
+        clearMessagesForLabel,
+
         // Getters
         isServerRunning,
         messageCount,
+        getTotalMessageCount,
         latestMessage,
-        messagesByType,
-        messagesByLabel,
-        uniqueLabels,
-        errorMessages,
-        logMessages,
         recentMessages,
         getStatistics,
         getMaxTimestampValue,
@@ -354,109 +632,32 @@ export const useSocketStore = defineStore('socket', () => {
         // Actions
         updateInputsStatus,
         updateServerStatus,
-        addMessage,
         addMessages,
+        addMessageBatch,
         addConnectionEvent,
         clearMessages,
         clearConnectionHistory,
         clearAll,
         broadcastMessage,
         getConnectedClients,
+
+        // Métriques des batches (NOUVEAU)
+        batchMetrics,
         initializeInputListeners,
         initializeSocketListeners,
         cleanup,
         toggleDebugMode,
         addDebugMessage,
         toggleIPCReception,
-        setMaxTimestampValue
+        setMaxTimestampValue,
+
+        // Gestion des variables pinnées (NOUVEAU)
+        pinnedVariablesByLabel,
+        pinnedVariableValues,
+        pinVariable,
+        unpinVariable,
+        setPinnedVariableMode,
+        getPinnedVariablesForLabel,
+        createPinnedVariablesComputed
     }
 })
-
-
-/*
-
-    //add some debug message for testing
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'variable',
-        variables:
-        {
-            toto: "4ms",
-
-        }
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'json',
-        jsonData: {
-            temperature: "22 °C",
-            humidity: "45 %",
-            pressure: "1013 hPa",
-            happinessIndex: 87
-        }
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'log-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'error-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'warning-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'info-message',
-        label: 'Process B',
-        msg: 'This is a debug log message from Process A.',
-        format: 'string',
-
-    })
-
-    messages.value.push({
-        id: 1,
-        timestamp: new Date().toISOString(),
-        type: 'info-message',
-        label: 'Process A',
-        msg: 'This is a debug log message from Process A.',
-        format: 'variable',
-        variables:
-        {
-            toto: "10 ms",
-
-        }
-
-    })
-
-    */
