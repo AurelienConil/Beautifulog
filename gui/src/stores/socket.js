@@ -303,9 +303,13 @@ export const useSocketStore = defineStore('socket', () => {
     }
 
     const clearMessages = () => {
-        messagesByLabel.value.clear()
+        // Préserver les labels et vider seulement le contenu des messages
+        const currentMap = messagesByLabel.value
+        currentMap.forEach((messages, label) => {
+            currentMap.set(label, []) // Vider les messages pour ce label mais garder le label
+        })
         triggerRef(messagesByLabel)
-        console.log('Tous les messages effacés du store')
+        console.log('Contenu des messages effacé (labels et variables pinnées préservés)')
     }
 
     const clearMessagesForLabel = (label) => {
@@ -455,9 +459,20 @@ export const useSocketStore = defineStore('socket', () => {
     }
 
     const clearAll = () => {
-        clearMessages()
+        clearMessages() // Maintenant préserve les labels et variables pinnées
         clearConnectionHistory()
-        console.log('Toutes les données du store effacées')
+        console.log('Messages effacés, labels et variables pinnées préservés')
+    }
+
+    const clearAllCompletely = () => {
+        messagesByLabel.value.clear()
+        pinnedVariablesByLabel.value.clear()
+        pinnedVariableValues.value.clear()
+        clearConnectionHistory()
+        triggerRef(messagesByLabel)
+        triggerRef(pinnedVariablesByLabel)
+        triggerRef(pinnedVariableValues)
+        console.log('Toutes les données du store complètement effacées')
     }
 
     const broadcastMessage = async (message) => {
@@ -638,6 +653,7 @@ export const useSocketStore = defineStore('socket', () => {
         clearMessages,
         clearConnectionHistory,
         clearAll,
+        clearAllCompletely,
         broadcastMessage,
         getConnectedClients,
 

@@ -45,9 +45,9 @@ function createWindow() {
     });
 
     // Gestionnaire d'événement pour la fermeture de la fenêtre
-    mainWindow.on('close', () => {
+    mainWindow.on('close', async () => {
         console.log('Fenêtre principale fermée, arrêt de l\'application...');
-        // Si besoin, effectuer des opérations de nettoyage supplémentaires ici
+        await cleanupApplication();
     });
 }
 
@@ -115,6 +115,34 @@ async function initializeInputs() {
 
     // Initialiser tous les inputs disponibles
     await inputManager.initializeInputs(config);
+}
+
+// Fonction de nettoyage lors de la fermeture
+async function cleanupApplication() {
+    console.log('Nettoyage de l\'application en cours...');
+    
+    // Arrêter le profiler de performance
+    if (performanceProfiler) {
+        console.log('Arrêt du profiler de performance...');
+        performanceProfiler.stopMonitoring();
+        performanceProfiler = null;
+    }
+    
+    // Arrêter le message batcher
+    if (messageBatcher) {
+        console.log('Arrêt du message batcher...');
+        messageBatcher.destroy();
+        messageBatcher = null;
+    }
+    
+    // Arrêter tous les inputs
+    if (inputManager) {
+        console.log('Arrêt de tous les inputs...');
+        await inputManager.stopAllInputs();
+        inputManager = null;
+    }
+    
+    console.log('Nettoyage terminé.');
 }
 
 // Gérer les messages reçus de tous les inputs
@@ -383,6 +411,32 @@ function setupIpcHandlers() {
     });
 }
 
+// Gérer les signaux système pour un arrêt propre
+process.on('SIGINT', async () => {
+    console.log('Signal SIGINT reçu, arrêt propre en cours...');
+    await cleanupApplication();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('Signal SIGTERM reçu, arrêt propre en cours...');
+    await cleanupApplication();
+    process.exit(0);
+});
+
+// Gérer les exceptions non capturées
+process.on('uncaughtException', async (error) => {
+    console.error('Exception non capturée:', error);
+    await cleanupApplication();
+    process.exit(1);
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('Promesse rejetée non gérée à:', promise, 'raison:', reason);
+    await cleanupApplication();
+    process.exit(1);
+});
+
 // Cette méthode sera appelée quand Electron aura fini
 // de s'initialiser et sera prêt à créer des fenêtres de navigateur.
 app.whenReady().then(async () => {
@@ -393,11 +447,9 @@ app.whenReady().then(async () => {
 
 // Quitter quand toutes les fenêtres sont fermées
 app.on('window-all-closed', async () => {
-    // Arrêter tous les inputs
-    if (inputManager) {
-        await inputManager.stopAllInputs();
-    }
-
+    console.log('Toutes les fenêtres sont fermées, arrêt de l\'application...');
+    await cleanupApplication();
+    
     // Quitter l'application même sur macOS
     app.quit();
 });
