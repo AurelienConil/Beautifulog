@@ -19,9 +19,6 @@ npm install
 ## Développement
 
 ```bash
-# Démarrer le serveur de développement
-npm run dev
-
 # Lancer l'application Electron en mode développement
 npm run electron:dev
 ```
@@ -29,11 +26,11 @@ npm run electron:dev
 ## Build
 
 ```bash
-# Build pour la production
+# Build du gui
 npm run build
 
-# Build de l'application Electron
-npm run electron:build
+# Start de l'application electron avec un gui build
+npm run start
 ```
 
 ## Structure du projet
@@ -68,11 +65,11 @@ npm run electron:build
 
 ## Scripts disponibles
 
-- `npm run dev` - Démarre le serveur Vite
-- `npm run build` - Build de production
-- `npm run preview` - Prévisualisation du build
-- `npm run electron:dev` - Lance Electron en développement
-- `npm run electron:build` - Build l'application Electron
+- `npm run dev` - Démarre le serveur Vite ( dev Vue3 only)
+- `npm run electron:dev` - Lance Electron avec npm run dev en parrallèle.
+- `npm run build` - Build de production pour Vue
+- `npm run start`- Lance Electron avec le build Vue.
+- `npm run electron:build` - Build l'application Electron en executable
 - `npm run test:socket` - Teste la connexion Socket.IO
 
 ---

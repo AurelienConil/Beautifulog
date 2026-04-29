@@ -48,6 +48,16 @@
         "files": [
             "dist/**/*",
             "main.js",
+            "preload.js",
+            "ChainHandler.js",
+            "DetectJSONHandler.js",
+            "DetectLabelHandler.js",
+            "DetectTypeHandler.js",
+            "DetectVariablesHandler.js",
+            "MessageBatcher.js",
+            "PerformanceProfiler.js",
+            "formatMessage.js",
+            "inputs/**",
             "node_modules/**/*"
         ],
         "mac": {

@@ -35,62 +35,53 @@
         </v-text-field>
       </div>
 
-      <!-- Icônes de navigation -->
-      <v-btn icon @click="openWelcomeModal" class="mr-2">
-        <v-icon>mdi-home</v-icon>
-      </v-btn>
-
-      <v-btn icon @click="openStoreModal" class="mr-2">
-        <v-icon>mdi-database</v-icon>
-      </v-btn>
-
-      <v-btn icon @click="openSocketModal" class="mr-2">
-        <v-icon>mdi-lan-connect</v-icon>
-      </v-btn>
-
-      <v-btn icon @click="openHelpModal" class="mr-2">
-        <v-icon>mdi-help-circle</v-icon>
-      </v-btn>
-
-      <!-- Toggle debug mode -->
-      <v-btn icon @click="socketStore.toggleDebugMode" class="mr-2">
-        <v-icon :color="socketStore.debugMode ? 'warning' : 'default'">
-          mdi-bug
-        </v-icon>
-      </v-btn>
-
-      <!-- Performance Monitor Button -->
+      <!-- Contrôles logs principaux (issus de DynamicTable) -->
+      <v-chip color="primary" size="small" class="mr-2">
+        {{
+          uniqueLabels && uniqueLabels.length ? uniqueLabels.length : 0
+        }}
+        process{{ uniqueLabels && uniqueLabels.length > 1 ? "us" : "" }}
+      </v-chip>
       <v-btn
-        icon
-        @click="showPerformanceModal = !showPerformanceModal"
-        class="mr-2"
-        v-tooltip="'Performance Monitor'"
-      >
-        <v-icon :color="showPerformanceModal ? 'primary' : 'default'">
-          mdi-speedometer
-        </v-icon>
-      </v-btn>
-
+        icon="mdi-refresh"
+        size="small"
+        @click="refreshData"
+        variant="text"
+        class="mr-1"
+      />
       <v-btn
-        icon
-        @click="toggleCompactMode"
-        class="mr-2 compact-mode-btn"
-        v-tooltip="'Mode compact'"
-      >
-        <v-icon>{{
-          themeStore.isCompact ? "mdi-fullscreen-exit" : "mdi-fullscreen"
-        }}</v-icon>
-      </v-btn>
-
-      <v-btn icon @click="toggleTheme">
-        <v-icon>{{
-          isDark ? "mdi-white-balance-sunny" : "mdi-weather-night"
-        }}</v-icon>
-      </v-btn>
+        icon="mdi-delete-sweep"
+        size="small"
+        @click="clearAllMessages"
+        variant="text"
+        color="error"
+        class="mr-1"
+      />
+      <v-btn
+        :icon="socketStore.IPCActivated ? 'mdi-pause' : 'mdi-play'"
+        size="small"
+        @click="socketStore.toggleIPCReception(!socketStore.IPCActivated)"
+        :color="socketStore.IPCActivated ? 'warning' : 'success'"
+        variant="text"
+        class="mr-1"
+      />
+      <span class="ml-2 mr-2">{{
+        socketStore.IPCActivated ? "IPC Actif" : "IPC Inactif"
+      }}</span>
+      <v-slider
+        v-if="!socketStore.IPCActivated"
+        v-model="socketStore.maxTimestampValue"
+        :min="socketStore.timeStampAtStop - 10000"
+        :max="socketStore.timeStampAtStop"
+        density="compact"
+        label="go back in time"
+        class="my-0 py-0 ml-4"
+        style="max-width: 200px; min-width: 120px"
+      />
     </v-app-bar>
 
     <v-main>
-      <v-container fluid class="fill-height pa-0">
+      <v-container fluid class="fillheight">
         <DynamicTable />
       </v-container>
     </v-main>
@@ -124,21 +115,6 @@
         </v-card-title>
         <v-card-text>
           <WelcomeCard />
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <!-- Modal StoreViewer -->
-    <v-dialog v-model="storeModal" max-width="1000px">
-      <v-card>
-        <v-card-title class="d-flex justify-space-between align-center">
-          <span>Store Viewer</span>
-          <v-btn icon @click="storeModal = false">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
-        <v-card-text>
-          <StoreViewer />
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -369,5 +345,11 @@ const hideDebugHelp = () => {
 
 .debug-input :deep(.v-icon) {
   color: rgba(255, 255, 255, 0.8);
+}
+
+.fillheight {
+  height: 100%;
+  margin-top: 0px;
+  padding-top: 0px;
 }
 </style>

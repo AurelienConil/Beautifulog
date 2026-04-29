@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
-const { formatMessage } = require('./formatMessage');
+const { formatMessage } = require(path.join(__dirname, 'formatMessage'));
 const InputManager = require('./inputs/InputManager');
 const MessageBatcher = require('./MessageBatcher');
 const PerformanceProfiler = require('./PerformanceProfiler');
@@ -36,8 +36,7 @@ function createWindow() {
         mainWindow.loadFile('dist/index.html');
     }
 
-    // Définir le facteur de zoom à 50%
-    mainWindow.webContents.setZoomFactor(0.8);
+
 
     // Afficher la fenêtre quand elle est prête
     mainWindow.once('ready-to-show', () => {

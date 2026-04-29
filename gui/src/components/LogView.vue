@@ -170,15 +170,9 @@
             :title="message.msg"
             style="padding: 8px; border-radius: 4px; margin-bottom: 2px"
           >
-            <div class="message-header">
-              <span class="timestamp">{{
-                formatTimestamp(message.timestamp)
-              }}</span>
-              <span
-                v-if="message.type"
-                class="type-label"
-                :class="message.type.replace('-message', '')"
-              >
+            <div class="message-header single-line-message">
+              <span class="timestamp" v-if="showtimestamp">{{ formatTimestamp(message.timestamp) }}</span>
+              <span v-if="message.type && showLabel" class="type-label" :class="message.type.replace('-message', '')">
                 {{ message.type.replace("-message", "") }}
               </span>
               <span v-if="message.format != 'string'" class="type-label">
@@ -187,44 +181,31 @@
               <span v-if="message.subLabel" class="type-label sublabel">
                 {{ message.subLabel }}
               </span>
-            </div>
-            <div class="message-data">
-              <pre v-if="isJsonData(message.msg)" class="json-data">{{
-                formatJson(message.msg)
-              }}</pre>
+              <!-- Affichage du message sur la même ligne -->
+              <template v-if="isJsonData(message.msg)">
+                <span class="json-data-inline">{{ formatJson(message.msg) }}</span>
+              </template>
               <template v-else-if="message.format === 'json'">
-                <div>
+                <span>
                   {{ message.msg }}
-                  <span
-                    class="open-json variable-link variable-badge"
-                    @click="openJsonModal(message.jsonData)"
-                    >Click to view JSON</span
-                  >
-                </div>
+                  <span class="open-json variable-link variable-badge" @click="openJsonModal(message.jsonData)">Click to view JSON</span>
+                </span>
               </template>
               <template v-else-if="message.format === 'variable'">
-                <div class="variable-message">
+                <span class="variable-message-inline">
                   {{ message.msg }}
-                  <div class="variables-container">
-                    <template
-                      v-for="(value, varName) in message.variables"
-                      :key="varName"
-                    >
-                      <span
-                        v-if="!isPinned(varName)"
-                        class="variable-link variable-badge"
-                        @click="pinVariable(varName, value, message.timestamp)"
-                      >
+                  <span class="variables-container">
+                    <template v-for="(value, varName) in message.variables" :key="varName">
+                      <span v-if="!isPinned(varName)" class="variable-link variable-badge" @click="pinVariable(varName, value, message.timestamp)">
                         {{ varName }}: {{ value }}
                         <v-icon size="x-small" class="ml-1">mdi-pin</v-icon>
                       </span>
-
                       <span v-else class="variable-badge variable-badge-pinned">
                         {{ varName }}
                       </span>
                     </template>
-                  </div>
-                </div>
+                  </span>
+                </span>
               </template>
               <span v-else>{{ message.msg }}</span>
             </div>
@@ -324,6 +305,12 @@ const selectedTypes = ref(messageTypes.map((type) => type.value));
 
 // État local pour les variables épinglées - DEPRECATED (maintenant dans le store)
 const pinnedVariables = ref({});
+
+
+const showtimestamp = ref(false);
+
+//Show label name, not needed as it is shown in the column title
+const showLabel = ref(false);
 
 // Vérifier si une variable est épinglée (utilise le store)
 const isPinned = (varName) => {
@@ -667,6 +654,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
+  overflow-x: auto;
 }
 
 .log-view {
@@ -711,7 +699,7 @@ onUnmounted(() => {
 }
 
 .message-header {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   margin-bottom: 4px;
 }
@@ -727,15 +715,38 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
-.json-data {
+
+.single-line-message {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+  text-overflow: initial;
+  width: 100%;
+  min-width: 0;
+}
+
+.json-data-inline {
   font-size: 0.75rem;
   background-color: rgba(0, 0, 0, 0.05);
-  padding: 8px;
+  padding: 2px 6px;
   border-radius: 4px;
-  margin: 4px 0;
+  margin: 0 4px;
+  max-width: 400px;
   overflow-x: auto;
-  max-height: 200px;
-  overflow-y: auto;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.variable-message-inline {
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 400px;
+  overflow-x: auto;
 }
 
 .variable-message {
