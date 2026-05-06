@@ -110,8 +110,28 @@ const socketStore = useSocketStore();
 // Stocker l'ordre d'apparition des labels
 const labelOrder = ref([]);
 
-// Stocker les labels masqués temporairement
-const hiddenLabels = ref([]);
+// Persisted across sessions via localStorage
+const HIDDEN_LABELS_KEY = "beautifulLog.hiddenLabels";
+
+const loadHiddenLabels = () => {
+  try {
+    const raw = localStorage.getItem(HIDDEN_LABELS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const hiddenLabels = ref(loadHiddenLabels());
+
+watch(
+  hiddenLabels,
+  (next) => {
+    localStorage.setItem(HIDDEN_LABELS_KEY, JSON.stringify(next));
+  },
+  { deep: true }
+);
 
 // Suivre les nouveaux messages pour capturer les nouveaux labels dans leur ordre d'apparition
 watch(

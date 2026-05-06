@@ -1,44 +1,81 @@
 <template>
   <div class="json-code-view pl-2">
-    <template v-for="(value, key, index) in data" :key="key">
-      <!-- Si c'est un objet ou un tableau -->
-      <div
-        v-if="isExpandable(value)"
-        @click="toggle(key)"
-        class="json-line cursor-pointer"
-      >
-        <v-icon size="x-small" class="mr-1">
-          {{ expanded[key] ? "mdi-chevron-down" : "mdi-chevron-right" }}
-        </v-icon>
-        <span class="key-name">{{ key }}</span
-        ><span class="punctuation">:</span>
-        <span class="type-info"
-          >{{ typeOf(value) }}{{ getObjectPreview(value) }}</span
-        >
-        <span v-if="index < Object.keys(data).length - 1" class="punctuation"
-          >,</span
-        >
+    <!-- Cas spécial: tableau au niveau racine -->
+    <template v-if="isRootArray">
+      <div class="json-line">
+        <span class="punctuation">[</span>
       </div>
+      <template v-for="(value, index) in data" :key="index">
+        <div
+          v-if="isExpandable(value)"
+          @click="toggle(index)"
+          class="json-line pl-3 cursor-pointer"
+        >
+          <v-icon size="x-small" class="mr-1">
+            {{ expanded[index] ? "mdi-chevron-down" : "mdi-chevron-right" }}
+          </v-icon>
+          <span class="type-info"
+            >{{ typeOf(value) }}{{ getObjectPreview(value) }}</span
+          >
+          <span v-if="index < data.length - 1" class="punctuation">,</span>
+        </div>
 
-      <div v-if="expanded[key]" class="pl-3 json-nested">
-        <JsonViewer :data="value" />
-      </div>
+        <div v-if="expanded[index]" class="pl-4 json-nested">
+          <JsonViewer :data="value" />
+        </div>
 
-      <!-- Si c'est une valeur simple -->
-      <div v-if="!isExpandable(value)" class="json-line">
-        <span class="key-name">{{ key }}</span
-        ><span class="punctuation">: </span>
-        <span :class="valueClass(value)">{{ formatValue(value) }}</span>
-        <span v-if="index < Object.keys(data).length - 1" class="punctuation"
-          >,</span
-        >
+        <div v-if="!isExpandable(value)" class="json-line pl-3">
+          <span :class="valueClass(value)">{{ formatValue(value) }}</span>
+          <span v-if="index < data.length - 1" class="punctuation">,</span>
+        </div>
+      </template>
+      <div class="json-line">
+        <span class="punctuation">]</span>
       </div>
+    </template>
+
+    <!-- Cas normal: objet ou tableau imbriqué -->
+    <template v-else>
+      <template v-for="(value, key, index) in data" :key="key">
+        <!-- Si c'est un objet ou un tableau -->
+        <div
+          v-if="isExpandable(value)"
+          @click="toggle(key)"
+          class="json-line cursor-pointer"
+        >
+          <v-icon size="x-small" class="mr-1">
+            {{ expanded[key] ? "mdi-chevron-down" : "mdi-chevron-right" }}
+          </v-icon>
+          <span class="key-name">{{ key }}</span
+          ><span class="punctuation">:</span>
+          <span class="type-info"
+            >{{ typeOf(value) }}{{ getObjectPreview(value) }}</span
+          >
+          <span v-if="index < Object.keys(data).length - 1" class="punctuation"
+            >,</span
+          >
+        </div>
+
+        <div v-if="expanded[key]" class="pl-3 json-nested">
+          <JsonViewer :data="value" />
+        </div>
+
+        <!-- Si c'est une valeur simple -->
+        <div v-if="!isExpandable(value)" class="json-line">
+          <span class="key-name">{{ key }}</span
+          ><span class="punctuation">: </span>
+          <span :class="valueClass(value)">{{ formatValue(value) }}</span>
+          <span v-if="index < Object.keys(data).length - 1" class="punctuation"
+            >,</span
+          >
+        </div>
+      </template>
     </template>
   </div>
 </template>
 
 <script setup>
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import { VIcon } from "vuetify/components";
 
 const props = defineProps({
@@ -49,6 +86,7 @@ const expanded = reactive({});
 
 const isExpandable = (val) => val && typeof val === "object";
 const typeOf = (val) => (Array.isArray(val) ? "Array" : "Object");
+const isRootArray = computed(() => Array.isArray(props.data));
 
 const toggle = (key) => {
   expanded[key] = !expanded[key];

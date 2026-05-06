@@ -177,16 +177,15 @@ class SocketInput extends LogInput {
      * Traite un message de log reçu
      * @private
      * @param {Object} socket - Socket émetteur
-     * @param {string} data - Message reçu
+     * @param {Object} data - Payload structuré { message, level, caller }
      */
     _handleLogMessage(socket, data) {
-        // Vérifier que data est un string
-        if (typeof data !== 'string') {
-            console.error('Le message doit être une chaîne de caractères');
+        // Only structured object payloads are supported
+        if (!data || typeof data !== 'object' || typeof data.message !== 'string') {
             return;
         }
 
-        //console.log(`Message reçu via Socket.IO (${socket.id}):`, data);
+        const { message, level, caller } = data;
 
         // Mettre à jour les métadonnées du socket
         if (this.connectedSockets.has(socket.id)) {
@@ -194,9 +193,11 @@ class SocketInput extends LogInput {
         }
 
         // Traiter le message avec les métadonnées
-        this._processMessage(data, {
+        this._processMessage(message, {
             socketId: socket.id,
-            clientCount: this.connectedSockets.size
+            clientCount: this.connectedSockets.size,
+            level,
+            caller
         });
     }
 

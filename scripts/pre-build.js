@@ -37,7 +37,6 @@ const filesToSync = [
     'ChainHandler.js',
     'DetectJSONHandler.js',
     'DetectLabelHandler.js',
-    'DetectTypeHandler.js',
     'DetectVariablesHandler.js'
 ];
 

@@ -61,15 +61,15 @@ async function initializeInputs() {
         guiUpdateInterval: 10000  // 10 secondes max au lieu de 30
     });
 
-    // Initialiser le profiler de performance
-    performanceProfiler = new PerformanceProfiler();
-    performanceProfiler.startMonitoring(2000); // Log toutes les 2 secondes
+    //Initialiser le profiler de performance
+    //performanceProfiler = new PerformanceProfiler();
+    //performanceProfiler.startMonitoring(2000); // Log toutes les 2 secondes
 
     // Configurer le callback pour envoyer les batches
     messageBatcher.setBatchCallback((batch) => {
-        performanceProfiler.recordEvent('batchSent', { size: batch.batchSize });
+        //performanceProfiler.recordEvent('batchSent', { size: batch.batchSize });
         if (mainWindow && !mainWindow.isDestroyed()) {
-            performanceProfiler.recordEvent('ipcSent');
+            //performanceProfiler.recordEvent('ipcSent');
             mainWindow.webContents.send('input-message-batch', batch);
         }
     });
@@ -88,6 +88,7 @@ async function initializeInputs() {
     // Configurer les callbacks pour traiter les messages
     inputManager.onMessage((data) => {
         try {
+            console.log(data.rawMessage);
             handleInputMessage(data);
         } catch (error) {
             console.error('Erreur lors du traitement du message:', error.message, 'Data:', data);
@@ -147,7 +148,7 @@ async function cleanupApplication() {
 // Gérer les messages reçus de tous les inputs
 function handleInputMessage(data) {
     // Validation rapide des données (plus efficace qu'un try...catch)
-    if (!data || !data.rawMessage) {
+    if (!data || !data.rawMessage || !data.level) {
         return;
     }
 
@@ -156,7 +157,7 @@ function handleInputMessage(data) {
         performanceProfiler.recordEvent('socketMessage');
     }
 
-    const formattedMessages = formatMessage(data.rawMessage);
+    const formattedMessages = formatMessage(data.rawMessage, data.level);
 
     formattedMessages.forEach(formattedMessage => {
         // Profiling: message formaté
@@ -178,6 +179,9 @@ function handleInputMessage(data) {
         }
         if (data.clientCount) {
             formattedMessage.clientCount = data.clientCount;
+        }
+        if (data.caller) {
+            formattedMessage.caller = data.caller;
         }
 
         // Ajouter au batcher au lieu d'envoyer directement

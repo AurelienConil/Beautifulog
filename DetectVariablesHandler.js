@@ -72,7 +72,10 @@ class DetectVariablesHandler extends ChainHandler {
         );
 
         item.msg = combinedMsg;
-        item.format = 'string';
+        // Only set format to 'string' if it's not already set to 'json'
+        if (item.format !== 'json') {
+            item.format = 'string';
+        }
 
 
         segmentObjects.forEach((segmentObj, index) => {

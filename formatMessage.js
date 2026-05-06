@@ -5,30 +5,42 @@
 
 const DetectLabelHandler = require('./DetectLabelHandler');
 const DetectVariablesHandler = require('./DetectVariablesHandler');
-const DetectTypeHandler = require('./DetectTypeHandler');
 const DetectJSONHandler = require('./DetectJSONHandler');
+
+// Map an explicit client-side level to the GUI-facing message type
+const LEVEL_TO_TYPE = {
+    error: 'error-message',
+    warn: 'warning-message',
+    warning: 'warning-message',
+    info: 'info-message',
+    log: 'log-message'
+};
+
+function levelToType(level) {
+    if (typeof level !== 'string') return 'log-message';
+    return LEVEL_TO_TYPE[level.toLowerCase()] || 'log-message';
+}
 
 /**
  * Formate un message string en objet structuré
- * @param {string} input - Le message à formatter
- * @param {Object} options - Options de formatage (pour usage futur)
- * @returns {Object} Objet formaté avec label, type, msg, format, variables et timestamp
+ * @param {string} rawMessage - Le message à formatter
+ * @param {string} level - Niveau explicite ("log" | "warn" | "error" | "info")
+ * @returns {Array<Object>} Tableau d'objets formatés avec label, type, msg, format, variables et timestamp
  */
-function formatMessage(rawMessages) {
-    // Convertir les messages bruts en un tableau d'objets
-    const data = [
-        { msg: rawMessages }
-    ]
+function formatMessage(rawMessage, level) {
+    const type = levelToType(level);
 
-    //console.log('Raw data for formatting:', data);
+    const data = [
+        { msg: rawMessage, type }
+    ];
 
     // Créer la chaîne de responsabilité
     const detectLabelHandler = new DetectLabelHandler();
-    const detectVariablesHandler = new DetectVariablesHandler();
-    const detectTypeHandler = new DetectTypeHandler();
     const detectJSONHandler = new DetectJSONHandler();
+    const detectVariablesHandler = new DetectVariablesHandler();
 
-    detectLabelHandler.setNext(detectVariablesHandler).setNext(detectTypeHandler).setNext(detectJSONHandler);
+    // Order: DetectJSON must run BEFORE DetectVariables to prevent JSON arrays from being split
+    detectLabelHandler.setNext(detectJSONHandler).setNext(detectVariablesHandler);
 
     // Traiter les données à travers la chaîne
     return detectLabelHandler.handle(data);

@@ -15,13 +15,19 @@ class DetectLabelHandler extends ChainHandler {
 
     detectLabel(item) {
         // Détecter si le message commence par un format [LABEL]
+        // Un label ne doit pas contenir de virgule, d'accolades ou de crochets (sinon c'est du JSON)
         const labelRegex = /^\s*\[\s*([^\]]+)\s*\]/;
         const match = item.msg.match(labelRegex);
 
-
         if (match) {
-            item.label = match[1].trim();
-            item.msg = item.msg.slice(match[0].length).trim();
+            const potentialLabel = match[1].trim();
+            // Vérifier que ce n'est pas du JSON: pas de virgule, pas d'accolades, pas de crochets
+            if (!potentialLabel.includes(',') && !potentialLabel.includes('{') && !potentialLabel.includes('[')) {
+                item.label = potentialLabel;
+                item.msg = item.msg.slice(match[0].length).trim();
+            } else {
+                item.label = 'log';
+            }
         } else {
             item.label = 'log';
         }

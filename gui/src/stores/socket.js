@@ -552,6 +552,11 @@ export const useSocketStore = defineStore('socket', () => {
                     timestamp: new Date().toISOString()
                 })
 
+                // First client of a new session → start with a clean message buffer
+                if (data.oldCount === 0 && data.newCount >= 1) {
+                    clearMessages()
+                }
+
                 // Mettre à jour le statut des inputs
                 updateInputsStatus()
             })

@@ -172,7 +172,7 @@
           >
             <div class="message-header single-line-message">
               <span class="timestamp" v-if="showtimestamp">{{ formatTimestamp(message.timestamp) }}</span>
-              <span v-if="message.type && showLabel" class="type-label" :class="message.type.replace('-message', '')">
+              <span  class="type-label" :class="message.type.replace('-message', '')" :title="message.caller || ''">
                 {{ message.type.replace("-message", "") }}
               </span>
               <span v-if="message.format != 'string'" class="type-label">
@@ -181,14 +181,10 @@
               <span v-if="message.subLabel" class="type-label sublabel">
                 {{ message.subLabel }}
               </span>
-              <!-- Affichage du message sur la même ligne -->
-              <template v-if="isJsonData(message.msg)">
-                <span class="json-data-inline">{{ formatJson(message.msg) }}</span>
-              </template>
-              <template v-else-if="message.format === 'json'">
+              <template v-if="message.format === 'json'">
                 <span>
-                  {{ message.msg }}
-                  <span class="open-json variable-link variable-badge" @click="openJsonModal(message.jsonData)">Click to view JSON</span>
+                  <span class="json-preview">{{ message.msg }}</span>
+                  <span class="open-json variable-link variable-badge" @click="openJsonModal(message.jsonData)">📋 View JSON</span>
                 </span>
               </template>
               <template v-else-if="message.format === 'variable'">
@@ -605,15 +601,6 @@ const formatTimestamp = (timestamp) => {
   });
 };
 
-// Vérifie si les données sont du JSON
-const isJsonData = (msg) => {
-  return typeof msg === "object" && msg !== null;
-};
-
-// Formate le JSON pour l'affichage
-const formatJson = (msg) => {
-  return JSON.stringify(msg, null, 2);
-};
 
 // État réactif pour le message survolé
 const hoveredMessage = ref(null);
@@ -727,9 +714,9 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.json-data-inline {
+.json-preview {
   font-size: 0.75rem;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(33, 150, 243, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
   margin: 0 4px;
@@ -737,6 +724,8 @@ onUnmounted(() => {
   overflow-x: auto;
   display: inline-block;
   vertical-align: middle;
+  color: #0550ae;
+  font-family: monospace;
 }
 
 .variable-message-inline {

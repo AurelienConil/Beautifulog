@@ -37,9 +37,7 @@
 
       <!-- Contrôles logs principaux (issus de DynamicTable) -->
       <v-chip color="primary" size="small" class="mr-2">
-        {{
-          uniqueLabels && uniqueLabels.length ? uniqueLabels.length : 0
-        }}
+        {{ uniqueLabels && uniqueLabels.length ? uniqueLabels.length : 0 }}
         process{{ uniqueLabels && uniqueLabels.length > 1 ? "us" : "" }}
       </v-chip>
       <v-btn
@@ -213,6 +211,11 @@ const addDebugMessage = () => {
     socketStore.addDebugMessage(debugMessage.value.trim());
     debugMessage.value = "";
   }
+};
+
+const clearAllMessages = () => {
+  console.log("Clearing all messages...");
+  socketStore.clearMessages();
 };
 
 const hideDebugHelp = () => {
