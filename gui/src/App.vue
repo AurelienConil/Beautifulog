@@ -142,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTheme } from "vuetify";
 import { useSocketStore } from "./stores/socket.js";
 import { useThemeStore } from "./stores/theme.js";
@@ -182,9 +182,15 @@ const toggleCompactMode = () => {
   themeStore.toggleCompactMode();
 };
 
-// Initialiser le thème au chargement
+// Initialiser au chargement
 onMounted(() => {
   themeStore.initialize();
+  socketStore.initializeInputListeners();
+});
+
+// Cleanup lors du démontage
+onUnmounted(() => {
+  socketStore.cleanup();
 });
 
 // Fonctions pour ouvrir les modales

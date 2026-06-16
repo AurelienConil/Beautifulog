@@ -477,92 +477,89 @@ export const useSocketStore = defineStore('socket', () => {
 
     const broadcastMessage = async (message) => {
         try {
-            if (window.electronAPI?.inputs?.broadcast) {
-                const result = await window.electronAPI.inputs.broadcast(message)
-                console.log('Message diffusé:', result)
-                return result
+            if (socketConnection) {
+                socketConnection.emit('broadcast', message);
+                console.log('Message diffusé:', message);
+                return { success: true };
             }
-            return { success: false, message: 'API Electron non disponible' }
+            return { success: false, message: 'Connexion WebSocket non disponible' };
         } catch (error) {
-            console.error('Erreur lors de la diffusion:', error)
-            return { success: false, message: error.message }
+            console.error('Erreur lors de la diffusion:', error);
+            return { success: false, message: error.message };
         }
     }
 
     const getConnectedClients = async () => {
-        try {
-            if (window.electronAPI?.socket?.getClients) {
-                const clients = await window.electronAPI.socket.getClients()
-                return clients
-            }
-            return []
-        } catch (error) {
-            console.error('Erreur lors de la récupération des clients:', error)
-            return []
-        }
+        // Pas d'API pour obtenir les clients en temps réel via WebSocket
+        // Cette méthode est placeholdée pour compatibilité
+        return [];
     }
 
-    // Initialisation des écouteurs IPC - adaptée pour tous les inputs
+    // Connexion WebSocket au backend
+    let socketConnection = null;
+
+    // Initialisation des écouteurs WebSocket
     const initializeInputListeners = () => {
-        if (window.electronAPI?.inputs) {
-            console.log('Initialisation des écouteurs d\'inputs dans le store')
+        import('socket.io-client').then(({ io }) => {
+            const serverUrl = import.meta.env.VITE_BACKEND_URL || 'ws://localhost:5000';
+            console.log('Connexion au serveur:', serverUrl);
 
-            // Écouter les BATCHES de messages (PRIORITÉ)
-            if (window.electronAPI.inputs.onMessageBatch) {
-                console.log('✅ Initialisation de l\'écouteur de batches')
-                window.electronAPI.inputs.onMessageBatch((batch) => {
-                    addMessageBatch(batch);
+            socketConnection = io(serverUrl, {
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                reconnectionAttempts: Infinity
+            });
+
+            socketConnection.on('connect', () => {
+                console.log('✅ Connecté au serveur WebSocket');
+                addConnectionEvent({
+                    type: 'connection',
+                    message: 'Connecté au serveur',
+                    timestamp: new Date().toISOString()
                 });
-            }
+            });
 
-            // Écouter les messages individuels (LEGACY - pour compatibilité)
-            window.electronAPI.inputs.onMessageReceived((data) => {
+            socketConnection.on('log-message', (data) => {
                 if (IPCActivated.value) {
-                    addMessageToLabel(data) // Utiliser la nouvelle méthode
-                    if (data.receivedAt && data.receivedAt > maxTimestampValue.value) {
-                        setMaxTimestampValue(data.receivedAt)
-                    }
-                } else {
-                    console.log('Message ignoré car la réception depuis le backend est désactivée:', data)
+                    import('../handlers/formatMessage.js').then(({ formatMessage }) => {
+                        const formattedMessages = formatMessage(data.message, data.level || 'log');
+                        formattedMessages.forEach(msg => {
+                            const messageData = {
+                                ...msg,
+                                timestamp: new Date().toISOString(),
+                                receivedAt: data.receivedAt || Date.now(),
+                                inputSource: 'websocket',
+                                inputType: 'socket.io',
+                                socketId: data.socketId
+                            };
+                            addMessageToLabel(messageData);
+                            if (messageData.receivedAt > maxTimestampValue.value) {
+                                setMaxTimestampValue(messageData.receivedAt);
+                            }
+                        });
+                    });
                 }
-            })
+            });
 
-            // Écouter les changements de statut des inputs
-            window.electronAPI.inputs.onStatusChanged((data) => {
+            socketConnection.on('disconnect', () => {
+                console.log('❌ Déconnecté du serveur');
                 addConnectionEvent({
-                    type: 'input-status',
-                    inputName: data.name,
-                    oldStatus: data.oldStatus,
-                    newStatus: data.newStatus,
-                    error: data.error,
+                    type: 'disconnection',
+                    message: 'Déconnecté du serveur',
                     timestamp: new Date().toISOString()
-                })
+                });
+            });
 
-                // Mettre à jour le statut des inputs
-                updateInputsStatus()
-            })
-
-            // Écouter les changements de clients
-            window.electronAPI.inputs.onClientChanged((data) => {
+            socketConnection.on('error', (error) => {
+                console.error('Erreur WebSocket:', error);
                 addConnectionEvent({
-                    type: 'client-change',
-                    inputName: data.name,
-                    oldCount: data.oldCount,
-                    newCount: data.newCount,
+                    type: 'error',
+                    message: `Erreur: ${error}`,
                     timestamp: new Date().toISOString()
-                })
-
-                // First client of a new session → start with a clean message buffer
-                if (data.oldCount === 0 && data.newCount >= 1) {
-                    clearMessages()
-                }
-
-                // Mettre à jour le statut des inputs
-                updateInputsStatus()
-            })
-        } else {
-            console.warn('APIs Electron Inputs non disponibles')
-        }
+                });
+            });
+        });
     }
 
     // Méthode legacy pour compatibilité
@@ -571,11 +568,10 @@ export const useSocketStore = defineStore('socket', () => {
     }
 
     const cleanup = () => {
-        if (window.electronAPI?.inputs) {
-            window.electronAPI.inputs.removeAllListeners('input-message-received')
-            window.electronAPI.inputs.removeAllListeners('input-status-changed')
-            window.electronAPI.inputs.removeAllListeners('input-client-changed')
-            console.log('Écouteurs d\'inputs nettoyés')
+        if (socketConnection) {
+            socketConnection.disconnect();
+            socketConnection = null;
+            console.log('Connexion WebSocket fermée');
         }
     }
 
@@ -586,28 +582,24 @@ export const useSocketStore = defineStore('socket', () => {
     }
 
     // Action pour ajouter un message de debug
-    const addDebugMessage = async (content) => {
-
-        // Transfert du message au backend via IPC
-        if (window.electronAPI?.socket?.sendMessageToBackend) {
-            try {
-                const result = await window.electronAPI.socket.sendMessageToBackend(content);
-
-                console.log('Message envoyé au backend via IPC:', result);
-
-                // Ajouter les messages formatés retournés par le backend au store
-                if (Array.isArray(result)) {
-                    result.forEach((formattedMessage) => addMessageToLabel(formattedMessage));
+    const addDebugMessage = (content) => {
+        // Le message est traité localement (pas d'envoi au backend)
+        import('../handlers/formatMessage.js').then(({ formatMessage }) => {
+            const formattedMessages = formatMessage(content, 'log');
+            formattedMessages.forEach(msg => {
+                const messageData = {
+                    ...msg,
+                    timestamp: new Date().toISOString(),
+                    receivedAt: Date.now(),
+                    inputSource: 'debug',
+                    inputType: 'manual'
+                };
+                addMessageToLabel(messageData);
+                if (messageData.receivedAt > maxTimestampValue.value) {
+                    setMaxTimestampValue(messageData.receivedAt);
                 }
-
-                return result;
-            } catch (error) {
-                console.error('Erreur lors de l\'envoi du message au backend via IPC:', error);
-            }
-        } else {
-            console.warn('API Electron pour envoyer des messages au backend non disponible');
-        }
-
+            });
+        });
     }
 
     // Statistiques
